@@ -30,8 +30,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
-    private static final int PAPER = Color.rgb(0xEC, 0xEE, 0xE8);
-    private static final int PAPER_DARK = Color.rgb(0x15, 0x16, 0x1B);
+    private static final int PAPER = Color.rgb(0xF2, 0xF3, 0xEF);
+    private static final int PAPER_DARK = Color.rgb(0x12, 0x13, 0x17);
     private FrameLayout root;
     private SharedPreferences prefs;
     private WebView web;
