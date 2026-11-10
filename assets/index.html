@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Radar de Outliers</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+/* Conceito: cartaz de feira de ciências impresso em risografia.
+   Papel frio, três tintas chapadas (rosa fluorescente, azul, amarelo) sobre preto de tinta.
+   Layout: masthead tipográfico, abas como fichário, ranking impresso separado por picotes. */
+:root{
+  --paper:#ECEEE8; --paper-2:#E2E5DD; --ink:#1B1C22; --muted:#5C5F68; --rule:rgba(27,28,34,.22);
+  --pink:#FF4F9E; --blue:#2457D6; --yellow:#FFD233;
+  --ok:#11795A; --warn:#A06A00; --bad:#D9262F;
+  --on-color:#1B1C22; --bar-bg:#1B1C22; --bar-fg:#ECEEE8; --bar-muted:#A9ABB4;
+  --field-focus:#FFFFFF; --err-bg:#F8DADB; --err-fg:#5E0F14; --dots:rgba(27,28,34,.07); --blend:multiply;
+  --display:"Big Shoulders Display","Roboto Condensed","Arial Narrow",sans-serif;
+  --body:"Archivo","Roboto",system-ui,sans-serif;
+  --mono:"IBM Plex Mono","Roboto Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --paper:#15161B; --paper-2:#20222A; --ink:#ECEEE8; --muted:#9B9EA9; --rule:rgba(236,238,232,.2);
+  --pink:#FF5FA8; --blue:#5C88FF; --yellow:#FFD233;
+  --ok:#43D19A; --warn:#F2BA4E; --bad:#FF5C65;
+  --on-color:#15161B; --bar-bg:#0B0C0F; --bar-fg:#ECEEE8; --bar-muted:#7E818C;
+  --field-focus:#2A2D36; --err-bg:#3A1B1E; --err-fg:#FFC9CC; --dots:rgba(236,238,232,.06); --blend:screen;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background-color:var(--paper);
+  background-image:radial-gradient(var(--dots) .9px, transparent 1.1px);
+  background-size:5px 5px;color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+
+/* ---------- masthead ---------- */
+.mast{max-width:720px;margin:0 auto;padding:18px 16px 14px;position:relative}
+.themebtn{background:none;border:0;padding:0;font:inherit;color:var(--ink);text-transform:uppercase;letter-spacing:.06em;text-decoration:underline;text-underline-offset:3px}
+.mast-meta{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px;border-bottom:1.5px solid var(--ink);padding-bottom:6px}
+.word{position:relative;margin:10px 0 0;font-family:var(--display);font-weight:900;text-transform:uppercase;line-height:.82;letter-spacing:-.01em}
+.word .l1{display:block;font-size:clamp(78px,24vw,132px);color:var(--pink);position:relative}
+.word .l1::after{content:"Radar";position:absolute;left:4px;top:3px;color:var(--blue);mix-blend-mode:var(--blend);opacity:.9}
+.word .l2{display:block;font-size:clamp(34px,10.5vw,58px);color:var(--ink);margin-top:2px}
+.svg-ink{fill:var(--ink)}
+.rings{position:absolute;right:10px;top:34px;width:min(34vw,170px);height:auto;pointer-events:none}
+.ink{margin-top:12px;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.ink-bar{flex:1;height:8px;border:1.5px solid var(--ink);background:var(--paper-2);position:relative;overflow:hidden}
+.ink-bar i{position:absolute;inset:0 auto 0 0;background:var(--blue);width:0}
+.ink b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+
+/* ---------- abas ---------- */
+.tabs{position:sticky;top:0;z-index:5;background:var(--bar-bg)}
+.tabs-in{max-width:720px;margin:0 auto;display:flex;padding:0 8px}
+.tab{flex:1;background:none;border:0;color:var(--bar-muted);font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.04em;text-transform:uppercase;padding:11px 4px 9px;border-bottom:5px solid transparent}
+.tab[aria-selected="true"]{color:var(--bar-fg);border-bottom-color:var(--pink)}
+.tab span{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--yellow)}
+
+main{max-width:720px;margin:0 auto;padding:18px 16px 48px;display:flex;flex-direction:column;gap:18px}
+.view{display:flex;flex-direction:column;gap:18px}
+
+/* ---------- formulário impresso ---------- */
+.form{border-top:4px solid var(--ink);padding-top:14px;display:flex;flex-direction:column;gap:16px}
+.form-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.form-h h2{margin:0;font-family:var(--display);font-weight:900;font-size:30px;text-transform:uppercase;line-height:1}
+.form-h span{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+label,.lbl{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+input,select,textarea{background:var(--paper-2);border:0;border-bottom:2px solid var(--ink);border-radius:0;padding:10px 8px 8px;width:100%;min-width:0;outline:none;font-size:15px;font-weight:600}
+select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat;padding-right:26px}
+input:focus,select:focus,textarea:focus{border-bottom-color:var(--pink);background-color:var(--field-focus)}
+textarea{min-height:96px;resize:vertical;font-weight:500;font-size:14px;line-height:1.5;font-family:var(--mono)}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1.5px solid var(--ink);background:transparent;padding:6px 11px;font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.go{border:0;background:var(--ink);color:var(--paper);font-family:var(--display);font-weight:900;font-size:28px;text-transform:uppercase;letter-spacing:.02em;padding:14px 18px 12px;display:flex;justify-content:space-between;align-items:center;box-shadow:6px 6px 0 var(--pink);transition:transform .08s,box-shadow .08s}
+.go:active{transform:translate(4px,4px);box-shadow:2px 2px 0 var(--pink)}
+.go:disabled{opacity:.45;box-shadow:none}
+.go svg{flex:none}
+.cost{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+
+.status{font-size:14px;padding:12px 14px;border-left:6px solid var(--blue);background:var(--paper-2)}
+.status.err{border-left-color:var(--bad);background:var(--err-bg);color:var(--err-fg)}
+
+/* ---------- ranking ---------- */
+.bar{display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--ink);padding-top:12px}
+.bar h2{margin:0;font-family:var(--display);font-weight:900;font-size:34px;text-transform:uppercase;line-height:.95}
+.bar h2 small{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.04em;margin-left:6px}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.card{padding:18px 0 22px;border-bottom:2px dashed var(--rule);display:flex;flex-direction:column;gap:10px}
+.card:last-child{border-bottom:0}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.card-h b{color:var(--ink);font-weight:500}
+.thumb{position:relative;display:block;margin:0 8px 30px 0;border:2px solid var(--ink);box-shadow:8px 8px 0 var(--blue);background:var(--paper-2);aspect-ratio:16/9;max-width:100%}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.dur{position:absolute;right:6px;top:6px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11.5px;padding:1px 6px}
+.sticker{position:absolute;left:-6px;bottom:-30px;background:var(--yellow);color:var(--on-color);border:2px solid var(--on-color);padding:2px 12px 0 10px;transform:rotate(-3deg);display:flex;align-items:baseline;gap:6px;box-shadow:3px 3px 0 var(--on-color)}
+.sticker strong{font-family:var(--display);font-weight:900;font-size:50px;line-height:1;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.sticker span{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;line-height:1.15;max-width:72px}
+.sticker.na{background:var(--paper-2);color:var(--ink);border-color:var(--ink)}
+.sticker.na strong{font-size:26px}
+.title{margin:6px 0 0;font-weight:800;font-size:18px;line-height:1.25;overflow-wrap:anywhere;text-wrap:balance}
+.title-pt{margin:-4px 0 0;font-size:14px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.title-pt::before{content:"PT ";font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--pink);font-weight:500}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 14px;font-variant-numeric:tabular-nums}
+.meta b{color:var(--ink);font-weight:500}
+.flag{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;background:var(--ink);color:var(--paper);padding:1px 5px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.act{border:1.5px solid var(--ink);background:transparent;padding:8px 11px;font-family:var(--display);font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.04em}
+.act.primary{background:var(--pink);color:var(--on-color);border-color:var(--pink)}
+.act[aria-pressed="true"]{background:var(--bar-bg);color:var(--yellow);border-color:var(--bar-bg)}
+
+/* ---------- Brasil ---------- */
+.br{margin-top:4px;background:var(--paper-2);border-left:6px solid var(--pink);padding:12px;display:flex;flex-direction:column;gap:10px}
+.qrow{display:flex;gap:8px;align-items:stretch}
+.qrow input{flex:1;background:var(--field-focus)}
+.qrow .act{flex:none}
+.stamp{align-self:flex-start;font-family:var(--display);font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:.05em;border:3px solid currentColor;padding:2px 12px 0;transform:rotate(-2.5deg);line-height:1.15;box-shadow:inset 0 0 0 2px var(--paper-2),inset 0 0 0 3.5px currentColor}
+.s-livre{color:var(--ok)} .s-fraca{color:var(--warn)} .s-feito{color:var(--bad)}
+.ptres{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.ptres li{display:flex;gap:10px;align-items:flex-start}
+.ptres img{width:104px;flex:none;aspect-ratio:16/9;object-fit:cover;border:1.5px solid var(--ink);background:var(--paper)}
+.ptres .t{min-width:0;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.ptres a{color:var(--ink);font-weight:700;text-decoration:none;overflow-wrap:anywhere}
+.ptres .m{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.same{align-self:flex-start;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;background:var(--bad);color:#fff;padding:1px 5px}
+
+/* ---------- estados ---------- */
+.empty{border-top:4px solid var(--ink);padding-top:14px;display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;color:var(--muted)}
+.empty strong{display:block;color:var(--ink);font-family:var(--display);font-weight:900;font-size:26px;text-transform:uppercase;line-height:1;margin-bottom:6px}
+.empty p{margin:0 0 6px;font-size:14px}
+.scan{display:flex;flex-direction:column;align-items:center;gap:12px;padding:30px 0}
+.scan svg .sweep{transform-origin:60px 60px;animation:spin 1.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.scan p{margin:0;font-family:var(--mono);font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink);text-align:center}
+@media (prefers-reduced-motion: reduce){.scan svg .sweep{animation:none}.go{transition:none}}
+
+/* ---------- chave ---------- */
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:12px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:10px;font-size:14.5px}
+ol.steps li::before{content:counter(s);font-family:var(--display);font-weight:900;font-size:30px;line-height:.9;color:var(--pink)}
+code,.mono{font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;overflow-wrap:anywhere}
+.keyrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.keyok{color:var(--ok);font-weight:800}
+@media (max-width:360px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="mast-meta"><span id="edition">Edição de hoje</span><button class="themebtn" id="themeBtn" type="button">Tema: auto</button></div>
+  <svg class="rings" viewBox="0 0 160 160" aria-hidden="true">
+    <g fill="none" stroke-width="5" style="mix-blend-mode:var(--blend)">
+      <circle cx="80" cy="80" r="74" stroke="#2457D6" opacity=".55"/>
+      <circle cx="80" cy="80" r="50" stroke="#2457D6" opacity=".55"/>
+      <circle cx="80" cy="80" r="26" stroke="#2457D6" opacity=".55"/>
+    </g>
+    <g fill="none" stroke-width="5" style="mix-blend-mode:var(--blend)" transform="translate(5 -4)">
+      <circle cx="80" cy="80" r="74" stroke="#FF4F9E" opacity=".7"/>
+      <circle cx="80" cy="80" r="50" stroke="#FF4F9E" opacity=".7"/>
+    </g>
+    <circle cx="124" cy="40" r="9" class="svg-ink"/>
+  </svg>
+  <h1 class="word"><span class="l1">Radar</span><span class="l2">de Outliers</span></h1>
+  <div class="ink"><span>Cota do dia</span><div class="ink-bar"><i id="inkFill"></i></div><b id="quota">0 / 10.000</b></div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <div class="tabs-in">
+    <button class="tab" role="tab" data-view="buscar" aria-selected="true">Buscar</button>
+    <button class="tab" role="tab" data-view="salvos" aria-selected="false">Salvos <span id="savedCount"></span></button>
+    <button class="tab" role="tab" data-view="chave" aria-selected="false">Chave</button>
+  </div>
+</nav>
+
+<main>
+  <section class="view" id="v-buscar">
+    <div class="form">
+      <div class="form-h"><h2>O que procurar</h2><span>YouTube · mundo</span></div>
+      <div class="row">
+        <div class="field"><label for="from">De</label><input type="date" id="from"></div>
+        <div class="field"><label for="to">Até</label><input type="date" id="to"></div>
+      </div>
+      <div class="chips" role="group" aria-label="Atalhos de período">
+        <button class="chip" data-days="1" type="button">24 h</button>
+        <button class="chip" data-days="7" type="button">7 dias</button>
+        <button class="chip" data-days="30" type="button">30 dias</button>
+        <button class="chip" data-days="90" type="button">3 meses</button>
+        <button class="chip" data-days="365" type="button">1 ano</button>
+      </div>
+      <div class="row">
+        <div class="field"><label for="format">Formato</label>
+          <select id="format"><option value="long">Vídeo longo</option><option value="short">Shorts</option></select></div>
+        <div class="field"><label for="lang">Idioma original</label>
+          <select id="lang"><option value="en">Inglês</option><option value="es">Espanhol</option><option value="fr">Francês</option><option value="de">Alemão</option></select></div>
+        <div class="field"><label for="minb">Breakout mínimo</label>
+          <select id="minb"><option value="0">Qualquer</option><option value="2" selected>2×</option><option value="5">5×</option><option value="10">10×</option><option value="30">30×</option></select></div>
+        <div class="field"><label for="minv">Views mínimas</label>
+          <select id="minv"><option value="1000">1 mil</option><option value="5000" selected>5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
+      </div>
+      <div class="field">
+        <label for="kw">Temas · um por linha</label>
+        <textarea id="kw" spellcheck="false"></textarea>
+        <p class="hint">Cada linha vira uma busca no YouTube. Os resultados são juntados e os repetidos somem.</p>
+      </div>
+      <div class="row">
+        <div class="field"><label for="order">Ordem da busca</label>
+          <select id="order"><option value="viewCount">Mais vistos</option><option value="relevance">Relevância</option></select></div>
+        <div class="field"><label for="pages">Vídeos por tema</label>
+          <select id="pages"><option value="1">50</option><option value="2">100</option></select></div>
+      </div>
+      <button class="go" id="go" type="button"><span id="goText">Buscar outliers</span>
+        <svg width="30" height="20" viewBox="0 0 30 20" aria-hidden="true"><path d="M0 10h26M18 2l8 8-8 8" fill="none" stroke="currentColor" stroke-width="3.2"/></svg></button>
+      <div class="cost" id="cost"></div>
+    </div>
+    <div class="status" id="status" hidden></div>
+    <div id="results">
+      <div class="empty">
+        <svg viewBox="0 0 96 96" width="96" height="96" aria-hidden="true">
+          <g fill="none" stroke-width="4"><circle cx="48" cy="48" r="42" stroke="#2457D6" opacity=".6"/><circle cx="48" cy="48" r="26" stroke="#2457D6" opacity=".6"/></g>
+          <path d="M48 48 L48 6 A42 42 0 0 1 84 27 Z" fill="#FF4F9E" opacity=".75" style="mix-blend-mode:var(--blend)"/>
+          <circle cx="70" cy="30" r="6" class="svg-ink"/>
+        </svg>
+        <div>
+          <strong>Nada no radar ainda</strong>
+          <p>Escolha o período e toque em Buscar. O app compara as views de cada vídeo com a mediana dos últimos vídeos do próprio canal e monta um ranking.</p>
+          <p>Em cada vídeo, “Já existe no Brasil?” procura no YouTube brasileiro se alguém já fez o mesmo tema.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-salvos" hidden><div id="savedList"></div></section>
+
+  <section class="view" id="v-chave" hidden>
+    <div class="form">
+      <div class="form-h"><h2>Chave da API</h2><span>fica só neste celular</span></div>
+      <div class="field">
+        <label for="apikey">Cole sua chave do YouTube Data API v3</label>
+        <input id="apikey" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…">
+      </div>
+      <div class="keyrow">
+        <button class="act primary" id="saveKey" type="button">Salvar e testar</button>
+        <span id="keyStatus" class="hint">O teste gasta 1 unidade.</span>
+      </div>
+    </div>
+    <div class="form">
+      <div class="form-h"><h2>Como criar</h2><span>uma vez · ~10 min</span></div>
+      <ol class="steps">
+        <li><span>Abra <span class="mono">console.cloud.google.com</span> no navegador e entre com sua conta Google.</span></li>
+        <li><span>No topo, crie um projeto novo (qualquer nome, como <code>radar</code>).</span></li>
+        <li><span>Em <b>APIs e serviços → Biblioteca</b>, procure <b>YouTube Data API v3</b> e toque em <b>Ativar</b>.</span></li>
+        <li><span>Em <b>APIs e serviços → Credenciais</b>, toque em <b>Criar credenciais → Chave de API</b>.</span></li>
+        <li><span>Recomendado: em <b>Restrições da API</b>, deixe só a <b>YouTube Data API v3</b>. Para travar a chave neste app, em <b>Restrições do aplicativo</b> escolha <b>Apps Android</b>, pacote <code>com.radaroutliers.app</code> e SHA-1 <code>__SHA1__</code>.</span></li>
+        <li><span>Copie a chave, cole aqui em cima e toque em <b>Salvar e testar</b>.</span></li>
+      </ol>
+      <p class="hint">A cota grátis é de 10.000 unidades por dia e zera à meia-noite do Pacífico (4h ou 5h da manhã em Brasília). Cada tema de busca gasta cerca de 100, e cada checagem no Brasil também.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const DAY = 86400000;
+  const DEFAULT_KW = ["what if science animation", "how does it work animated explained", "what happens to your body animation"].join("\n");
+
+  // ---------- armazenamento local ----------
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    del(k){ try { localStorage.removeItem(k); } catch {} }
+  };
+
+  // ---------- ponte nativa (APK) ou fetch (navegador) ----------
+  const pending = new Map(); let seq = 0;
+  window.__resp = (id, status, body) => { const p = pending.get(id); if (p){ pending.delete(id); p({ status, body }); } };
+  function httpGet(url){
+    if (window.Native && window.Native.get){
+      return new Promise((resolve) => { const id = ++seq; pending.set(id, resolve); window.Native.get(id, url); });
+    }
+    return fetch(url).then(async r => ({ status: r.status, body: await r.text() })).catch(e => ({ status: 0, body: String(e) }));
+  }
+  function openExternal(url){ if (window.Native && window.Native.open) window.Native.open(url); else window.open(url, "_blank"); }
+  function share(text){ if (window.Native && window.Native.share) window.Native.share(text); else if (navigator.share) navigator.share({ text }).catch(()=>{}); }
+
+  // ---------- cota ----------
+  const pacificDay = () => { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); } catch { return new Date().toISOString().slice(0,10); } };
+  function addUnits(n){ const k = "units." + pacificDay(); store.set(k, store.get(k, 0) + n); paintQuota(); }
+  function paintQuota(){ const u = store.get("units." + pacificDay(), 0); $("quota").textContent = u.toLocaleString("pt-BR") + " / 10.000"; const f = $("inkFill"); f.style.width = Math.min(100, u/100) + "%"; f.style.background = u > 8000 ? "var(--bad)" : ""; }
+
+  // ---------- API do YouTube ----------
+  class ApiError extends Error { constructor(reason, msg, status){ super(msg); this.reason = reason; this.status = status; } }
+  const COST = { search: 100, videos: 1, channels: 1, playlistItems: 1, i18nRegions: 1 };
+  async function yt(endpoint, params){
+    const key = store.get("apikey", "");
+    if (!key) throw new ApiError("nokey", "Sem chave");
+    const qs = new URLSearchParams({ ...params, key });
+    const r = await httpGet("https://www.googleapis.com/youtube/v3/" + endpoint + "?" + qs.toString());
+    addUnits(COST[endpoint] || 1);
+    let j = null; try { j = JSON.parse(r.body); } catch {}
+    if (r.status === 200 && j) return j;
+    const reason = j?.error?.errors?.[0]?.reason || j?.error?.details?.[0]?.reason || (r.status === 0 ? "network" : "http" + r.status);
+    throw new ApiError(reason, j?.error?.message || r.body || "erro", r.status);
+  }
+  function errText(e){
+    const r = (e && e.reason) || "";
+    if (r === "nokey") return "Cadastre sua chave da API na aba Chave da API.";
+    if (/quotaExceeded|dailyLimitExceeded|rateLimitExceeded/i.test(r)) return "A cota grátis do dia acabou. Ela zera à meia-noite do horário do Pacífico (4h ou 5h da manhã em Brasília).";
+    if (/keyInvalid|API_KEY_INVALID|badRequest/i.test(r) && /key/i.test(e.message||"")) return "A chave da API é inválida. Confira se copiou inteira, na aba Chave da API.";
+    if (/accessNotConfigured|SERVICE_DISABLED/i.test(r)) return "A YouTube Data API v3 não está ativada no seu projeto do Google Cloud. Ative em APIs e serviços → Biblioteca.";
+    if (/ANDROID_APP_BLOCKED|ipRefererBlocked|API_KEY_HTTP_REFERRER_BLOCKED|forbidden|API_KEY_SERVICE_BLOCKED/i.test(r)) return "A chave está restrita e bloqueou este app. Confira as restrições da chave no Google Cloud (pacote e SHA-1 na aba Chave da API).";
+    if (r === "network") return "Sem conexão com a internet.";
+    return "A API do YouTube recusou o pedido (" + r + "). " + (e.message || "");
+  }
+  function showStatus(msg, isErr){ const s = $("status"); s.hidden = !msg; s.textContent = msg || ""; s.classList.toggle("err", !!isErr); }
+
+  // ---------- utilidades ----------
+  const iso = (d) => { const z = new Date(d.getTime() - d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); };
+  const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+  function secs(isoDur){ const m = String(isoDur||"").match(/P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/); if (!m) return null; return (+m[1]||0)*86400 + (+m[2]||0)*3600 + (+m[3]||0)*60 + (+m[4]||0); }
+  function durText(s){ if (s == null) return ""; const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=Math.floor(s%60); return (h? h+":"+String(m).padStart(2,"0") : m) + ":" + String(x).padStart(2,"0"); }
+  const short = (n) => n == null ? "?" : n >= 1e6 ? (n/1e6).toFixed(n>=1e7?0:1).replace(".",",")+" mi" : n >= 1e3 ? (n/1e3).toFixed(n>=1e4?0:1).replace(".",",")+" mil" : String(Math.round(n));
+  const fmtMult = (b) => b == null ? "?" : (b >= 10 ? Math.round(b) : b.toFixed(1).replace(".",",")) + "x";
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("pt-BR", { day:"2-digit", month:"short", year:"numeric" }) : "";
+  const chunk = (a, n) => { const o = []; for (let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; };
+  const median = (a) => { if (!a.length) return null; const s = [...a].sort((x,y)=>x-y); const m = s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; };
+  async function pool(items, n, fn){ let i = 0; const run = async () => { while (i < items.length){ const k = i++; await fn(items[k], k); } }; await Promise.all(Array.from({length: Math.min(n, items.length)}, run)); }
+  const decode = (s) => { const t = document.createElement("textarea"); t.innerHTML = s || ""; return t.value; };
+  const fitsFormat = (sec, fmt) => sec == null ? true : fmt === "short" ? sec <= 180 : sec > 180;
+  function el(tag, attrs, ...kids){
+    const n = document.createElement(tag);
+    for (const [k,v] of Object.entries(attrs||{})) { if (v == null || v === false) continue; if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v === true ? "" : v); }
+    for (const k of kids.flat()) if (k != null && k !== false) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+    return n;
+  }
+
+  function scanner(label){
+    const wrap = el("div",{class:"scan"});
+    wrap.innerHTML = '<svg width="120" height="120" viewBox="0 0 120 120" aria-hidden="true"><g fill="none" stroke-width="4"><circle cx="60" cy="60" r="54" stroke="#2457D6" opacity=".55"/><circle cx="60" cy="60" r="34" stroke="#2457D6" opacity=".55"/><circle cx="60" cy="60" r="14" stroke="#2457D6" opacity=".55"/></g><path class="sweep" d="M60 60 L60 6 A54 54 0 0 1 106 32 Z" fill="#FF4F9E" opacity=".75" style="mix-blend-mode:var(--blend)"/><circle cx="60" cy="60" r="4" class="svg-ink"/></svg>';
+    wrap.append(label); return wrap;
+  }
+
+  // ---------- período ----------
+  function setRange(days){ const t = today(); $("to").value = iso(t); $("from").value = iso(new Date(t.getTime() - days*DAY)); markChip(); updateCost(); }
+  function markChip(){
+    const span = Math.round((new Date($("to").value) - new Date($("from").value))/DAY);
+    const toIsToday = $("to").value === iso(today());
+    document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(toIsToday && +c.dataset.days === span)));
+  }
+  const lanes = () => $("kw").value.split("\n").map(s => s.trim()).filter(Boolean).slice(0, 10);
+  function updateCost(){
+    const n = lanes().length, p = +$("pages").value;
+    $("cost").textContent = n ? `${n} ${n>1?"temas":"tema"} · cerca de ${(n*p*100 + 60).toLocaleString("pt-BR")} de 10.000 unidades grátis do dia` : "Adicione pelo menos um tema";
+    $("go").disabled = busy || !n;
+    store.set("kw", $("kw").value);
+  }
+
+  // ---------- busca de outliers ----------
+  let busy = false, videos = [], sortBy = "breakout";
+  async function run(){
+    if (busy) return;
+    if (!store.get("apikey","")){ showStatus("Cadastre sua chave da API na aba Chave da API.", true); switchView("chave"); return; }
+    const from = $("from").value, to = $("to").value;
+    if (!from || !to || from > to){ showStatus("Confira as datas: a data inicial precisa ser anterior à final.", true); return; }
+    busy = true; updateCost(); $("goText").textContent = "Buscando…"; showStatus("");
+    const res = $("results"); res.innerHTML = "";
+    const prog = el("p",{},"Varrendo o YouTube…"); res.append(scanner(prog));
+    const fmt = $("format").value, minV = +$("minv").value, minB = +$("minb").value;
+    const after = new Date(from + "T00:00:00").toISOString(), before = new Date(to + "T23:59:59").toISOString();
+    try {
+      // 1. busca
+      const ids = new Map();
+      for (const q of lanes()){
+        let token = "";
+        for (let p = 0; p < +$("pages").value; p++){
+          prog.textContent = `Buscando "${q}"…`;
+          const params = { part:"snippet", type:"video", q, maxResults:"50", order:$("order").value, publishedAfter:after, publishedBefore:before, relevanceLanguage:$("lang").value, safeSearch:"none" };
+          if (fmt === "short") params.videoDuration = "short";
+          if (token) params.pageToken = token;
+          const r = await yt("search", params);
+          for (const it of r.items || []){ const id = it.id?.videoId; if (!id) continue; if (!ids.has(id)) ids.set(id, new Set()); ids.get(id).add(q); }
+          token = r.nextPageToken; if (!token) break;
+        }
+      }
+      // 2. detalhes dos vídeos
+      prog.textContent = `Conferindo ${ids.size} vídeos…`;
+      let cands = [];
+      for (const part of chunk([...ids.keys()], 50)){
+        const r = await yt("videos", { part:"snippet,statistics,contentDetails", id: part.join(","), maxResults:"50" });
+        for (const v of r.items || []){
+          const s = secs(v.contentDetails?.duration), views = +(v.statistics?.viewCount || 0);
+          if (!fitsFormat(s, fmt) || views < minV) continue;
+          if (v.snippet?.liveBroadcastContent && v.snippet.liveBroadcastContent !== "none") continue;
+          cands.push({ id: v.id, title: v.snippet.title, channelId: v.snippet.channelId, channel: v.snippet.channelTitle,
+            published: v.snippet.publishedAt, sec: s, views, likes: +(v.statistics?.likeCount || 0),
+            thumb: v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || "", lanes: [...ids.get(v.id)] });
+        }
+      }
+      // 3. canais
+      const chIds = [...new Set(cands.map(c => c.channelId))];
+      const chans = new Map();
+      prog.textContent = `Analisando ${chIds.length} canais…`;
+      for (const part of chunk(chIds, 50)){
+        const r = await yt("channels", { part:"snippet,statistics,contentDetails", id: part.join(","), maxResults:"50" });
+        for (const c of r.items || []) chans.set(c.id, { subs: c.statistics?.hiddenSubscriberCount ? null : +(c.statistics?.subscriberCount || 0), country: c.snippet?.country || "", uploads: c.contentDetails?.relatedPlaylists?.uploads, total: +(c.statistics?.videoCount || 0), totalViews: +(c.statistics?.viewCount || 0) });
+      }
+      // 4. média de cada canal (mediana dos últimos envios do mesmo formato)
+      let done = 0;
+      await pool(chIds, 5, async (cid) => {
+        const ch = chans.get(cid); if (!ch || !ch.uploads) return;
+        try {
+          const pl = await yt("playlistItems", { part:"contentDetails", playlistId: ch.uploads, maxResults:"50" });
+          const vids = (pl.items || []).map(i => i.contentDetails?.videoId).filter(Boolean);
+          if (vids.length){
+            const r = await yt("videos", { part:"statistics,contentDetails,snippet", id: vids.join(","), maxResults:"50" });
+            ch.recent = (r.items || []).map(v => ({ id: v.id, views: +(v.statistics?.viewCount || 0), sec: secs(v.contentDetails?.duration), at: Date.parse(v.contentDetails?.videoPublishedAt || v.snippet?.publishedAt) }));
+          }
+        } catch (e) { if (/quota/i.test(e.reason)) throw e; }
+        done++; prog.textContent = `Analisando canais… ${done} de ${chIds.length}`;
+      });
+      const now = Date.now();
+      for (const c of cands){
+        const ch = chans.get(c.channelId) || {};
+        c.subs = ch.subs ?? null; c.country = ch.country || "";
+        const base = (ch.recent || []).filter(v => v.id !== c.id && fitsFormat(v.sec, fmt) && now - v.at > 2*DAY).map(v => v.views);
+        c.baseN = base.length;
+        const med = median(base);
+        c.baseline = base.length >= 4 && med > 0 ? med : (ch.total > 0 && ch.totalViews > 0 ? ch.totalViews / ch.total : null);
+        c.baseKind = base.length >= 4 && med > 0 ? "recent" : "lifetime";
+        c.breakout = c.baseline ? c.views / c.baseline : null;
+        const hours = Math.max(1, (now - Date.parse(c.published)) / 3600000);
+        c.vph = c.views / hours;
+        c.br = store.get("br." + c.id, null);
+      }
+      videos = cands.filter(c => c.breakout == null ? minB === 0 : c.breakout >= minB);
+      busy = false; $("goText").textContent = "Buscar outliers"; updateCost();
+      store.set("last", videos);
+      render();
+    } catch (e) {
+      busy = false; $("goText").textContent = "Buscar outliers"; updateCost();
+      res.innerHTML = ""; showStatus(errText(e), true);
+    }
+  }
+
+  // ---------- render ----------
+  function sorted(list){
+    const k = { breakout: c => c.breakout ?? -1, views: c => c.views, vph: c => c.vph, recent: c => Date.parse(c.published) }[sortBy];
+    return [...list].sort((a,b) => k(b) - k(a));
+  }
+  function render(){
+    const res = $("results"); res.innerHTML = "";
+    if (!videos.length){
+      res.append(el("div",{class:"empty",style:"grid-template-columns:1fr"}, el("div",{}, el("strong",{},"Nada passou no filtro"), el("p",{},"Tente um breakout menor, menos views mínimas, outro período ou outros temas."))));
+      return;
+    }
+    const sorts = [["breakout","Breakout"],["vph","Views/hora"],["views","Views"],["recent","Recentes"]];
+    res.append(el("div",{class:"bar"},
+      el("h2",{}, "Ranking", el("small",{}, `${videos.length} vídeo${videos.length>1?"s":""}`)),
+      el("div",{class:"chips"}, sorts.map(([k,t]) => el("button",{class:"chip",type:"button","aria-pressed":String(sortBy===k),onclick:()=>{ sortBy=k; render(); }}, t)))));
+    const ul = el("ul",{class:"list"}); sorted(videos).forEach((v,i) => ul.append(card(v, i+1))); res.append(ul);
+  }
+  const saved = () => store.get("saved", {});
+  function toggleSave(v, btn){
+    const s = saved();
+    if (s[v.id]) delete s[v.id]; else s[v.id] = { ...v, savedAt: Date.now() };
+    store.set("saved", s); btn.setAttribute("aria-pressed", String(!!s[v.id])); btn.textContent = s[v.id] ? "Salvo" : "Salvar"; paintSavedCount();
+  }
+  function card(v, rank){
+    const url = "https://www.youtube.com/watch?v=" + v.id;
+    const isSaved = !!saved()[v.id];
+    const brBox = el("div",{class:"br",id:"br-"+v.id, hidden: !v.br});
+    const hasB = v.breakout != null;
+    const c = el("li",{class:"card"},
+      el("div",{class:"card-h"}, el("span",{}, rank ? el("b",{}, "Nº " + String(rank).padStart(2,"0")) : el("b",{}, "Salvo"), " · ", fmtDate(v.published)), el("span",{}, v.country || "")),
+      el("a",{class:"thumb",href:url,onclick:(e)=>{ e.preventDefault(); openExternal(url); }},
+        v.thumb ? el("img",{src:v.thumb,alt:"",loading:"lazy"}) : null,
+        v.sec != null ? el("span",{class:"dur"}, durText(v.sec)) : null,
+        el("span",{class:"sticker" + (hasB ? "" : " na")},
+          el("strong",{}, hasB ? fmtMult(v.breakout) : "sem base"),
+          hasB ? el("span",{}, v.baseKind === "lifetime" ? "a média geral do canal" : "a média do canal") : null)),
+      el("p",{class:"title"}, decode(v.title)),
+      el("p",{class:"title-pt", id:"pt-"+v.id}, ptTitle(v)),
+      el("div",{class:"meta"}, el("span",{}, el("b",{}, v.channel)), v.subs != null ? el("span",{}, short(v.subs) + " inscritos") : null,
+        v.subs != null && v.subs < 1000 ? el("span",{class:"flag"},"canal pequeno") : null),
+      el("div",{class:"meta"},
+        el("span",{}, el("b",{}, short(v.views)), " views"),
+        el("span",{}, el("b",{}, short(v.vph)), "/hora"),
+        v.baseline ? el("span",{}, "média ", el("b",{}, short(v.baseline))) : null),
+      el("div",{class:"actions"},
+        el("button",{class:"act primary",type:"button",onclick:()=>{ brBox.hidden = false; paintBR(brBox, v); brBox.querySelector("input")?.focus(); }}, "Já existe no Brasil?"),
+        el("button",{class:"act",type:"button","aria-pressed":String(isSaved),onclick:(e)=>toggleSave(v, e.currentTarget)}, isSaved ? "Salvo" : "Salvar"),
+        el("button",{class:"act",type:"button",onclick:()=>share(decode(v.title) + "\n" + url)}, "Enviar")),
+      brBox);
+    if (v.br) paintBR(brBox, v);
+    return c;
+  }
+
+  // ---------- checagem no Brasil ----------
+  const DICT = {"couldn't":"não conseguisse","can't":"não pode","don't":"não","won't":"não vai","isn't":"não é","didn't":"não","what":"o que","if":"se","what if":"e se","what happens":"o que acontece","happens":"acontece","happened":"aconteceu","why":"por que","how":"como","does":"","do":"","is":"é","are":"são","the":"o","a":"um","an":"um","of":"de","to":"para","in":"em","on":"em","inside":"dentro de","your":"seu","you":"você","body":"corpo","brain":"cérebro","earth":"terra","planet":"planeta","planets":"planetas","universe":"universo","space":"espaço","sun":"sol","moon":"lua","mars":"marte","black hole":"buraco negro","star":"estrela","stars":"estrelas","ocean":"oceano","oceans":"oceanos","every":"cada","day":"dia","days":"dias","year":"ano","years":"anos","hour":"hora","hours":"horas","life":"vida","live":"viver","lived":"vivesse","die":"morrer","dying":"morrer","death":"morte","survive":"sobreviver","never":"nunca","would":"","could":"poderia","world":"mundo","human":"humano","humans":"humanos","people":"pessoas","animal":"animal","animals":"animais","water":"água","fire":"fogo","ice":"gelo","cube":"cubo","hot":"quente","hottest":"mais quente","cold":"frio","coldest":"mais frio","biggest":"maior","largest":"maior","smallest":"menor","fastest":"mais rápido","faster":"mais rápido","stronger":"mais forte","luckier":"mais sortudo","smaller":"menor","bigger":"maior","stop":"parar","kept":"continuasse","getting":"ficando","got":"ficasse","made":"fizesse","sleep":"dormir","dream":"sonho","light":"luz","time":"tempo","speed":"velocidade","size":"tamanho","comparison":"comparação","explained":"explicado","history":"história","future":"futuro","prehistoric":"pré-histórico","dinosaurs":"dinossauros","science":"ciência","injection":"injeção","breath":"respiração","journey":"jornada","single":"único","magnetic field":"campo magnético","dimension":"dimensão","dimensions":"dimensões","temperature":"temperatura","possible":"possível","after":"depois de","before":"antes de","without":"sem","with":"com","only":"só","most":"mais","really":"realmente","actually":"na verdade","this":"isso","that":"isso","there":"lá","and":"e","or":"ou","for":"por","from":"de","at":"em","be":"ser","were":"fosse","was":"foi","it":"","its":"seu","my":"meu"};
+  function draftPT(title){
+    let t = " " + decode(title).toLowerCase().replace(/[|#()\[\]!?.,:;"“”…]/g, " ").replace(/\s+/g," ") + " ";
+    const keys = Object.keys(DICT).sort((a,b) => b.length - a.length);
+    for (const k of keys) t = t.replace(new RegExp(" " + k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "(?= )", "g"), " " + DICT[k] + "\u0001");
+    return t.replace(/\u0001/g,"").replace(/\s+/g," ").trim();
+  }
+  function ptTitle(v){ const t = (v.br && v.br.query) || draftPT(v.title); return t ? t.charAt(0).toUpperCase() + t.slice(1) : ""; }
+  const STOP = new Set("o a os as um uma uns umas de do da dos das e ou que se em no na nos nas por para com sem como é são seu sua seus suas você voce isso esse essa este esta ao aos à às mais muito the of and to in what if how why your you is are".split(" "));
+  const norm = (s) => decode(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ");
+  const words = (s) => [...new Set(norm(s).split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w)))];
+  const looksPT = (v) => /^pt/i.test(v.lang || "") || /[ãõçáéíóúâêô]/i.test(v.title) || /\b(você|voce|que|não|nao|como|porque|por que|seu|sua)\b/i.test(v.title);
+
+  function paintBR(box, v){
+    box.innerHTML = "";
+    const q = v.br?.query || draftPT(v.title);
+    const input = el("input",{type:"text",value:q,"aria-label":"Busca em português"});
+    const btn = el("button",{class:"act primary",type:"button"}, v.br && !v.br.loading ? "De novo" : "Buscar");
+    btn.addEventListener("click", () => checkBR(v, input.value.trim(), box));
+    box.append(el("span",{class:"lbl"},"Busca em português · ajuste se a tradução ficou estranha"), el("div",{class:"qrow"}, input, btn));
+    if (!v.br) { box.append(el("p",{class:"hint"},"Gasta cerca de 100 unidades.")); return; }
+    if (v.br.loading){ box.append(el("p",{class:"hint"},"Procurando no YouTube brasileiro…")); return; }
+    if (v.br.error){ box.append(el("p",{class:"hint",style:"color:var(--bad)"}, v.br.error)); return; }
+    const V = { livre:["s-livre","Livre no Brasil"], fraca:["s-fraca","Só versão fraca"], feito:["s-feito","Já feito no Brasil"] }[v.br.verdict];
+    box.append(el("span",{class:"stamp "+V[0]}, V[1]), el("p",{class:"hint"}, v.br.reason + " É uma estimativa pelas palavras do título; confira os vídeos abaixo."));
+    if (v.br.results?.length){
+      box.append(el("ul",{class:"ptres"}, v.br.results.slice(0,6).map(m => {
+        const u = "https://www.youtube.com/watch?v=" + m.id;
+        return el("li",{}, el("img",{src:m.thumb,alt:"",loading:"lazy"}),
+          el("div",{class:"t"}, m.same ? el("span",{class:"same"},"mesmo tema") : null,
+            el("a",{href:u,onclick:(e)=>{ e.preventDefault(); openExternal(u); }}, decode(m.title)),
+            el("span",{class:"m"}, `${m.channel} · ${short(m.views)} views${m.sec != null ? " · " + durText(m.sec) : ""}`)));
+      })));
+    }
+  }
+  async function checkBR(v, query, box){
+    if (!query) return;
+    v.br = { loading: true, query }; paintBR(box, v);
+    const ptEl = document.getElementById("pt-" + v.id); if (ptEl) ptEl.textContent = ptTitle(v);
+    try {
+      const r = await yt("search", { part:"snippet", type:"video", q: query, maxResults:"15", regionCode:"BR", relevanceLanguage:"pt", order:"relevance" });
+      const ids = (r.items || []).map(i => i.id?.videoId).filter(Boolean);
+      let results = [];
+      if (ids.length){
+        const d = await yt("videos", { part:"snippet,statistics,contentDetails", id: ids.join(","), maxResults:"50" });
+        results = (d.items || []).map(x => ({ id: x.id, title: x.snippet.title, channel: x.snippet.channelTitle, views: +(x.statistics?.viewCount || 0), sec: secs(x.contentDetails?.duration), lang: x.snippet.defaultAudioLanguage || x.snippet.defaultLanguage || "", thumb: x.snippet.thumbnails?.medium?.url || x.snippet.thumbnails?.default?.url || "" }));
+      }
+      const kw = words(query);
+      for (const m of results){
+        const tw = new Set(words(m.title));
+        const hit = kw.filter(w => tw.has(w) || (w.length >= 5 && [...tw].some(t => t.length >= 5 && t.slice(0,4) === w.slice(0,4)))).length;
+        m.same = looksPT(m) && kw.length > 0 && hit >= Math.max(2, Math.ceil(kw.length * 0.4));
+      }
+      results.sort((a,b) => (b.same - a.same) || (b.views - a.views));
+      const same = results.filter(m => m.same);
+      const fmtOk = (m) => v.sec != null && v.sec > 180 ? (m.sec || 0) > 180 : true;
+      const strong = same.filter(m => fmtOk(m) && m.views >= 20000);
+      let verdict, reason;
+      if (!same.length){ verdict = "livre"; reason = "Nenhum vídeo em português com as mesmas palavras-chave apareceu."; }
+      else if (strong.length){ verdict = "feito"; reason = `Achei ${strong.length} vídeo${strong.length>1?"s":""} em português no mesmo tema com mais de 20 mil views.`; }
+      else { verdict = "fraca"; reason = `Existe${same.length>1?"m":""} ${same.length} vídeo${same.length>1?"s":""} em português no tema, mas com poucas views${v.sec > 180 ? " ou só em Shorts" : ""}.`; }
+      v.br = { verdict, reason, query, results: results.slice(0, 6) };
+      store.set("br." + v.id, v.br);
+      const s = saved(); if (s[v.id]){ s[v.id].br = v.br; store.set("saved", s); }
+    } catch (e) { v.br = { error: errText(e), query }; }
+    paintBR(box, v);
+  }
+
+  // ---------- salvos ----------
+  function paintSavedCount(){ const n = Object.keys(saved()).length; $("savedCount").textContent = n ? `(${n})` : ""; }
+  function renderSaved(){
+    const box = $("savedList"); box.innerHTML = "";
+    const list = Object.values(saved()).sort((a,b) => b.savedAt - a.savedAt);
+    if (!list.length){ box.append(el("div",{class:"empty",style:"grid-template-columns:1fr"}, el("div",{}, el("strong",{},"Nenhuma ideia guardada"), el("p",{},"Toque em Salvar num vídeo do ranking para guardar a ideia aqui.")))); return; }
+    const ul = el("ul",{class:"list"}); list.forEach(v => { v.br = store.get("br."+v.id, v.br || null); ul.append(card(v, 0)); }); box.append(ul);
+  }
+
+  // ---------- chave ----------
+  async function saveKey(){
+    const k = $("apikey").value.trim();
+    if (!k){ $("keyStatus").textContent = "Cole a chave primeiro."; return; }
+    store.set("apikey", k); $("keyStatus").textContent = "Testando…";
+    try { await yt("i18nRegions", { part:"snippet", hl:"pt_BR" }); $("keyStatus").innerHTML = '<span class="keyok">Chave funcionando.</span>'; }
+    catch (e) { $("keyStatus").textContent = errText(e); }
+  }
+
+  // ---------- navegação ----------
+  function switchView(name){
+    document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === name)));
+    document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== "v-" + name);
+    if (name === "salvos") renderSaved();
+    window.scrollTo(0, 0);
+  }
+  window.__back = () => {
+    const cur = document.querySelector('.tab[aria-selected="true"]')?.dataset.view;
+    if (cur && cur !== "buscar"){ switchView("buscar"); return true; }
+    return false;
+  };
+
+  // ---------- tema ----------
+  const THEME_LABEL = { auto: "Tema: auto", dark: "Tema: escuro", light: "Tema: claro" };
+  function systemDark(){
+    try { if (window.Native && window.Native.systemDark) return window.Native.systemDark(); } catch {}
+    return !!(window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  function applyTheme(){
+    const pref = store.get("theme", "auto");
+    const dark = pref === "dark" || (pref === "auto" && systemDark());
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    $("themeBtn").textContent = THEME_LABEL[pref];
+    try { if (window.Native && window.Native.setBars) window.Native.setBars(dark); } catch {}
+  }
+  window.__sysTheme = applyTheme;
+  $("themeBtn").addEventListener("click", () => {
+    const order = ["auto","dark","light"]; const cur = store.get("theme","auto");
+    store.set("theme", order[(order.indexOf(cur)+1) % order.length]); applyTheme();
+  });
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch {}
+  applyTheme();
+
+  // ---------- init ----------
+  $("kw").value = store.get("kw", DEFAULT_KW);
+  $("apikey").value = store.get("apikey", "");
+  for (const id of ["format","lang","minb","minv","order","pages"]){ const v = store.get("opt."+id, null); if (v) $(id).value = v; $(id).addEventListener("change", () => { store.set("opt."+id, $(id).value); updateCost(); }); }
+  setRange(7);
+  document.querySelectorAll(".chip[data-days]").forEach(c => c.addEventListener("click", () => setRange(+c.dataset.days)));
+  for (const id of ["from","to"]) $(id).addEventListener("change", () => { markChip(); updateCost(); });
+  $("kw").addEventListener("input", updateCost);
+  $("go").addEventListener("click", run);
+  $("saveKey").addEventListener("click", saveKey);
+  document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => switchView(t.dataset.view)));
+  paintQuota(); paintSavedCount();
+  $("edition").textContent = "Edição de " + new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"short", year:"numeric" }).replace(/\./g,"");
+  const last = store.get("last", null);
+  if (last && last.length){ videos = last; render(); }
+  if (!store.get("apikey","")) switchView("chave");
+})();
+
+</script>
+</body>
+</html>
