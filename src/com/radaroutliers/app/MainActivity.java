@@ -30,8 +30,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
-    private static final int PAPER = Color.rgb(0xF2, 0xF3, 0xEF);
-    private static final int PAPER_DARK = Color.rgb(0x12, 0x13, 0x17);
+    private static final int PAPER = Color.rgb(0xF4, 0xF3, 0xF0);
+    private static final int PAPER_DARK = Color.rgb(0x0D, 0x0D, 0x0F);
     private FrameLayout root;
     private SharedPreferences prefs;
     private WebView web;
@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
         certSha1 = signingSha1();
 
         prefs = getSharedPreferences("radar", MODE_PRIVATE);
-        boolean dark0 = prefs.getBoolean("dark", isSystemDark());
+        boolean dark0 = prefs.getBoolean("dark", true);
         if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
 
         root = new FrameLayout(this);
