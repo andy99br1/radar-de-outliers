@@ -433,7 +433,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   }
 
   // ---------- busca ----------
-  let busy = false, videos = [], sortBy = "breakout", mode = store.get("mode", "cards"), idx = 0, history = [];
+  let busy = false, videos = [], allCands = [], diag = null, sortBy = "breakout", mode = store.get("mode", "cards"), idx = 0, history = [];
   function scanner(text){
     const w = el("div",{class:"scan"});
     w.innerHTML = '<svg width="90" height="90" viewBox="0 0 90 90" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" opacity=".25"><circle cx="45" cy="45" r="40"/><circle cx="45" cy="45" r="22"/></g><path class="sweep" d="M45 45 L45 5 A40 40 0 0 1 80 25 Z" fill="#FFB020" opacity=".85"/><circle cx="45" cy="45" r="3.5" fill="currentColor"/></svg>';
@@ -455,26 +455,27 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     try {
       const ids = new Map();
       for (const { q, topic } of queries()){
-        const params = { part:"snippet", type:"video", q, maxResults:"50", order:"viewCount", publishedAfter:after, publishedBefore:before, relevanceLanguage:$("lang").value };
+        const params = { part:"snippet", type:"video", q, maxResults:"50", order:"relevance", publishedAfter:after, publishedBefore:before, relevanceLanguage:$("lang").value };
         if (fmt === "short") params.videoDuration = "short";
         const r = await yt("search", params);
         for (const it of r.items || []){ const id = it.id?.videoId; if (!id) continue; if (!ids.has(id)) ids.set(id, new Set()); if (topic) ids.get(id).add(topic); }
       }
       sc.set(`Conferindo ${ids.size} vídeos…`);
-      const cands = [];
+      const cands = []; diag = { found: ids.size, format: 0, views: 0, breakout: 0 };
       for (const part of chunk([...ids.keys()], 50)){
-        const r = await yt("videos", { part:"snippet,statistics,contentDetails", id: part.join(","), maxResults:"50" });
+        const r = await yt("videos", { part:"snippet,statistics,contentDetails", id: part.join(",") });
         for (const v of r.items || []){
           const s = secs(v.contentDetails?.duration), views = +(v.statistics?.viewCount || 0);
-          if (!fitsFormat(s, fmt) || views < minV) continue;
-          if (v.snippet?.liveBroadcastContent && v.snippet.liveBroadcastContent !== "none") continue;
+          if (v.snippet?.liveBroadcastContent && v.snippet.liveBroadcastContent !== "none"){ diag.format++; continue; }
+          if (!fitsFormat(s, fmt)){ diag.format++; continue; }
+          if (views < minV){ diag.views++; continue; }
           cands.push({ id: v.id, title: v.snippet.title, channelId: v.snippet.channelId, channel: v.snippet.channelTitle, published: v.snippet.publishedAt, sec: s, views,
             thumb: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url || "", topics: [...ids.get(v.id)] });
         }
       }
       const chIds = [...new Set(cands.map(c => c.channelId))], chans = new Map();
       for (const part of chunk(chIds, 50)){
-        const r = await yt("channels", { part:"statistics,contentDetails", id: part.join(","), maxResults:"50" });
+        const r = await yt("channels", { part:"statistics,contentDetails", id: part.join(",") });
         for (const c of r.items || []) chans.set(c.id, { subs: c.statistics?.hiddenSubscriberCount ? null : +(c.statistics?.subscriberCount || 0), uploads: c.contentDetails?.relatedPlaylists?.uploads, total: +(c.statistics?.videoCount || 0), totalViews: +(c.statistics?.viewCount || 0) });
       }
       let done = 0;
@@ -485,7 +486,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
             const pl = await yt("playlistItems", { part:"contentDetails", playlistId: ch.uploads, maxResults:"50" });
             const vids = (pl.items || []).map(i => i.contentDetails?.videoId).filter(Boolean);
             if (vids.length){
-              const r = await yt("videos", { part:"statistics,contentDetails,snippet", id: vids.join(","), maxResults:"50" });
+              const r = await yt("videos", { part:"statistics,contentDetails,snippet", id: vids.join(",") });
               ch.recent = (r.items || []).map(v => ({ id: v.id, views: +(v.statistics?.viewCount || 0), sec: secs(v.contentDetails?.duration), at: Date.parse(v.snippet?.publishedAt) }));
             }
           } catch (e) { if (/quota/i.test(e.reason)) throw e; }
@@ -496,14 +497,22 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       for (const c of cands){
         const ch = chans.get(c.channelId) || {};
         c.subs = ch.subs ?? null;
-        const base = (ch.recent || []).filter(v => v.id !== c.id && fitsFormat(v.sec, fmt) && now - v.at > 2*DAY).map(v => v.views);
-        const med = median(base);
-        c.baseline = base.length >= 4 && med > 0 ? med : (ch.total > 0 && ch.totalViews > 0 ? ch.totalViews / ch.total : null);
+        // Curva típica: um vídeo junta ~26% das views do 1º mês em 3 dias, ~50% em 7, ~95% em 30.
+        const curve = (days) => 1 - Math.exp(-Math.max(days, 0.25) / 10);
+        const ageDays = (now - Date.parse(c.published)) / DAY;
+        const others = (ch.recent || []).filter(v => v.id !== c.id && fitsFormat(v.sec, fmt) && now - v.at > 2*DAY);
+        // estima quanto cada vídeo do canal tinha na idade do candidato
+        const atAge = others.map(v => v.views * Math.min(1, curve(ageDays) / curve((now - v.at) / DAY)));
+        const med = median(atAge);
+        const life = ch.total > 0 && ch.totalViews > 0 ? (ch.totalViews / ch.total) * curve(ageDays) : null;
+        c.baseline = atAge.length >= 4 && med > 0 ? med : life;
         c.breakout = c.baseline ? c.views / c.baseline : null;
         c.vph = c.views / Math.max(1, (now - Date.parse(c.published)) / 3600000);
         c.br = store.get("br." + c.id, null);
       }
-      videos = cands.filter(c => c.breakout == null ? minB === 0 : c.breakout >= minB).sort((a,b) => (b.breakout ?? -1) - (a.breakout ?? -1));
+      allCands = [...cands].sort((a,b) => (b.breakout ?? -1) - (a.breakout ?? -1));
+      videos = allCands.filter(c => c.breakout == null ? minB === 0 : c.breakout >= minB);
+      diag.breakout = allCands.length - videos.length; diag.minB = minB; diag.minV = minV;
       const used = new Set(); for (const t of TOPICS){ const best = videos.find(v => v.topics.includes(t.id) && !used.has(v.id)) || videos.find(v => v.topics.includes(t.id)); if (best){ used.add(best.id); store.set("tthumb." + t.id, best.thumb); } }
       store.set("last", videos); idx = 0; history = [];
       $("lastBtn").hidden = true;
@@ -526,7 +535,20 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     res.append(el("div",{class:"rbar"},
       el("button",{class:"back",type:"button","aria-label":"Nova busca",onclick:showForm}, icon("back")),
       el("h2",{}, "Em alta lá fora", el("small",{}, videos.length ? `${videos.length} vídeos · ${PERIOD_TXT[period]}` : "")), videos.length ? modeBox : null));
-    if (!videos.length){ res.append(el("div",{class:"empty"}, el("strong",{},"Nenhum vídeo encontrado"), el("p",{},"Tente outros temas, um período maior ou menos filtros."), el("button",{class:"btn2 amber",type:"button",onclick:showForm},"Nova busca"))); return; }
+    if (!videos.length){
+      const lines = [];
+      if (diag){
+        lines.push(`O YouTube devolveu ${diag.found} vídeos.`);
+        if (diag.format) lines.push(`${diag.format} cortados pelo formato (${$("format").value === "short" ? "não eram Shorts" : "eram Shorts ou lives"}).`);
+        if (diag.views) lines.push(`${diag.views} tinham menos de ${short(diag.minV)} views.`);
+        if (diag.breakout) lines.push(`${diag.breakout} ficaram abaixo de ${diag.minB}× a média do canal.`);
+      }
+      res.append(el("div",{class:"empty"}, el("strong",{}, diag && diag.found ? "Nada passou nos filtros" : "Nenhum vídeo encontrado"),
+        lines.length ? el("p",{}, lines.join(" ")) : el("p",{},"Tente outros temas ou um período maior."),
+        allCands.length ? el("button",{class:"btn2 amber",type:"button",onclick:()=>{ videos = allCands; store.set("last", videos); idx = 0; history = []; renderResults(); }}, `Mostrar mesmo assim (${allCands.length})`) : null,
+        el("button",{class:"btn2",type:"button",onclick:showForm},"Nova busca")));
+      return;
+    }
     if (mode === "cards") renderDeck(res); else renderList(res, sorted(), true);
   }
 
@@ -673,7 +695,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       const ids = (r.items || []).map(i => i.id?.videoId).filter(Boolean);
       let results = [];
       if (ids.length){
-        const d = await yt("videos", { part:"snippet,statistics,contentDetails", id: ids.join(","), maxResults:"50" });
+        const d = await yt("videos", { part:"snippet,statistics,contentDetails", id: ids.join(",") });
         results = (d.items || []).map(x => ({ id: x.id, title: x.snippet.title, channel: x.snippet.channelTitle, views: +(x.statistics?.viewCount || 0), sec: secs(x.contentDetails?.duration), lang: x.snippet.defaultAudioLanguage || x.snippet.defaultLanguage || "", thumb: x.snippet.thumbnails?.medium?.url || "" }));
       }
       const kw = words(query);
