@@ -251,7 +251,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
           <div class="field"><label for="lang">Idioma original</label><select id="lang"><option value="en">Inglês</option><option value="es">Espanhol</option><option value="fr">Francês</option><option value="de">Alemão</option></select></div>
           <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
           <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
-          <div class="field full"><label for="custom">Outro tema (em inglês, opcional)</label><input id="custom" type="text" placeholder="ex.: black holes explained" autocomplete="off"></div>
+          <div class="field full"><label for="custom">Outro tema em inglês (curto funciona melhor)</label><input id="custom" type="text" placeholder="1 a 3 palavras, ex.: black holes" autocomplete="off"></div>
         </div>
       </details>
       <div class="note" id="status" hidden></div>
@@ -317,18 +317,18 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   const DAY = 86400000;
 
   const TOPICS = [
-    { id:"whatif", name:"E se…?", q:"what if animated science", c:["#6D28D9","#DB2777"], icon:'<path d="M9 9a3 3 0 1 1 4.5 2.6c-.9.5-1.5 1.2-1.5 2.4"/><circle cx="12" cy="18" r=".6"/>' },
-    { id:"space", name:"Espaço", q:"space universe explained animation", c:["#0F172A","#2563EB"], icon:'<circle cx="12" cy="12" r="4"/><path d="M3 15c3-1 15-7 18-9"/>' },
-    { id:"body", name:"Corpo humano", q:"human body explained animation", c:["#9F1239","#F97316"], icon:'<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>' },
-    { id:"brain", name:"Cérebro e mente", q:"brain psychology explained animated", c:["#831843","#A855F7"], icon:'<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>' },
-    { id:"animals", name:"Animais", q:"animal facts explained animation", c:["#14532D","#65A30D"], icon:'<circle cx="7" cy="9" r="1.8"/><circle cx="12" cy="6.5" r="1.8"/><circle cx="17" cy="9" r="1.8"/><path d="M8.5 16.5c0-2.2 1.6-4 3.5-4s3.5 1.8 3.5 4-1.6 2.5-3.5 2.5-3.5-.3-3.5-2.5z"/>' },
-    { id:"prehistory", name:"Pré-história", q:"prehistoric dinosaurs explained animation", c:["#422006","#B45309"], icon:'<path d="M4 18c2-1 3-4 3-7s2-6 6-6 5 2 5 4-2 2-2 2l3 7M10 18v-3M14 18v-4"/>' },
-    { id:"physics", name:"Física", q:"physics explained animation", c:["#0C4A6E","#06B6D4"], icon:'<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)"/>' },
-    { id:"earth", name:"Planeta Terra", q:"earth geology ocean explained animation", c:["#064E3B","#0EA5E9"], icon:'<circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z"/>' },
-    { id:"tech", name:"Como funciona", q:"how it works engineering explained animation", c:["#1F2937","#64748B"], icon:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>' },
-    { id:"scale", name:"Escala e tamanho", q:"size comparison scale animation", c:["#312E81","#F59E0B"], icon:'<rect x="3" y="13" width="5" height="7" rx="1"/><rect x="10" y="9" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>' },
-    { id:"chem", name:"Química", q:"chemistry explained animation", c:["#3F6212","#14B8A6"], icon:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>' },
-    { id:"sleep", name:"Ciência p/ dormir", q:"science documentary for sleep", c:["#020617","#4338CA"], icon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>' }
+    { id:"whatif", name:"E se…?", q:"what if", c:["#6D28D9","#DB2777"], icon:'<path d="M9 9a3 3 0 1 1 4.5 2.6c-.9.5-1.5 1.2-1.5 2.4"/><circle cx="12" cy="18" r=".6"/>' },
+    { id:"space", name:"Espaço", q:"space explained", c:["#0F172A","#2563EB"], icon:'<circle cx="12" cy="12" r="4"/><path d="M3 15c3-1 15-7 18-9"/>' },
+    { id:"body", name:"Corpo humano", q:"human body", c:["#9F1239","#F97316"], icon:'<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>' },
+    { id:"brain", name:"Cérebro e mente", q:"brain explained", c:["#831843","#A855F7"], icon:'<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>' },
+    { id:"animals", name:"Animais", q:"animal facts", c:["#14532D","#65A30D"], icon:'<circle cx="7" cy="9" r="1.8"/><circle cx="12" cy="6.5" r="1.8"/><circle cx="17" cy="9" r="1.8"/><path d="M8.5 16.5c0-2.2 1.6-4 3.5-4s3.5 1.8 3.5 4-1.6 2.5-3.5 2.5-3.5-.3-3.5-2.5z"/>' },
+    { id:"prehistory", name:"Pré-história", q:"dinosaurs", c:["#422006","#B45309"], icon:'<path d="M4 18c2-1 3-4 3-7s2-6 6-6 5 2 5 4-2 2-2 2l3 7M10 18v-3M14 18v-4"/>' },
+    { id:"physics", name:"Física", q:"physics explained", c:["#0C4A6E","#06B6D4"], icon:'<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)"/>' },
+    { id:"earth", name:"Planeta Terra", q:"earth explained", c:["#064E3B","#0EA5E9"], icon:'<circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z"/>' },
+    { id:"tech", name:"Como funciona", q:"how it works", c:["#1F2937","#64748B"], icon:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>' },
+    { id:"scale", name:"Escala e tamanho", q:"size comparison", c:["#312E81","#F59E0B"], icon:'<rect x="3" y="13" width="5" height="7" rx="1"/><rect x="10" y="9" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>' },
+    { id:"chem", name:"Química", q:"chemistry explained", c:["#3F6212","#14B8A6"], icon:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>' },
+    { id:"sleep", name:"Ciência p/ dormir", q:"science for sleep", c:["#020617","#4338CA"], icon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>' }
   ];
   const IC = {
     check:'<path d="M5 12.5l4.5 4.5L19 7"/>', x:'<path d="M6 6l12 12M18 6L6 18"/>', save:'<path d="M6 3h12v18l-6-4-6 4z"/>',
@@ -540,9 +540,9 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       const lines = [];
       if (diag){
         lines.push(`O YouTube devolveu ${diag.found} vídeos.`);
-        if (diag.format) lines.push(`${diag.format} cortados pelo formato (${$("format").value === "short" ? "não eram Shorts" : "eram Shorts, vídeos de até 3 min ou lives"}).`);
-        if (diag.views) lines.push(`${diag.views} tinham menos de ${short(diag.minV)} views.`);
-        if (diag.breakout) lines.push(`${diag.breakout} ficaram abaixo de ${diag.minB}× a média do canal.`);
+        if (diag.format) lines.push(`${diag.format} ${diag.format>1?"cortados":"cortado"} pelo formato (${$("format").value === "short" ? "não eram Shorts" : "eram Shorts, vídeos de até 3 min ou lives"}).`);
+        if (diag.views) lines.push(`${diag.views} ${diag.views>1?"tinham":"tinha"} menos de ${short(diag.minV)} views.`);
+        if (diag.breakout) lines.push(`${diag.breakout} ${diag.breakout>1?"ficaram":"ficou"} abaixo de ${diag.minB}× a média do canal.`);
       }
       res.append(el("div",{class:"empty"}, el("strong",{}, diag && diag.found ? "Nada passou nos filtros" : "Nenhum vídeo encontrado"),
         lines.length ? el("p",{}, lines.join(" ")) : el("p",{},"Tente outros temas ou um período maior."),
