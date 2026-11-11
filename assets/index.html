@@ -38,6 +38,13 @@ main{max-width:600px;margin:0 auto;padding:22px 16px 150px}
 
 /* ---------- busca ---------- */
 .hello{font-size:15px;color:var(--muted)}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.qchip{display:flex;align-items:center;gap:7px;background:var(--card);border-radius:99px;padding:5px 11px 5px 9px;font-size:12.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.qchip i{display:block;width:34px;height:6px;border-radius:6px;background:var(--raised);overflow:hidden;position:relative}
+.qchip i b{position:absolute;inset:0 auto 0 0;background:var(--ok);border-radius:6px}
+.qchip.mid i b{background:var(--amber)} .qchip.high i b{background:var(--bad)}
+.qchip.high{color:var(--bad)}
+.liveq{font-size:12.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .headline{margin:2px 0 0;font-size:31px;font-weight:900;line-height:1.06;letter-spacing:-.02em;text-wrap:balance}
 .headline em{font-style:normal;color:var(--amber-text)}
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -239,7 +246,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   <section class="view" id="v-buscar">
     <div id="form" class="view">
       <div>
-        <div class="hello" id="hello">Olá</div>
+        <div class="topline"><span class="hello" id="hello">Olá</span><button class="qchip" id="quotaChip" type="button" aria-label="Cota grátis usada hoje"></button></div>
         <h1 class="headline" id="headline">O que estourou <em>lá fora</em> esta semana?</h1>
       </div>
       <div class="chips" id="period" role="group" aria-label="Período">
@@ -398,7 +405,15 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   // ---------- cota ----------
   const pacificDay = () => { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); } catch { return new Date().toISOString().slice(0,10); } };
   function addUnits(n){ const k = "units." + pacificDay(); store.set(k, store.get(k, 0) + n); paintQuota(); }
-  function paintQuota(){ const u = store.get("units." + pacificDay(), 0); $("quota").textContent = u.toLocaleString("pt-BR") + " de 10.000"; $("meter").style.width = Math.min(100, u/100) + "%"; }
+  function paintQuota(){
+    const u = store.get("units." + pacificDay(), 0), pct = Math.min(100, u / 100);
+    const pctTxt = (pct < 10 && pct > 0 ? pct.toFixed(1).replace(".", ",") : Math.round(pct)) + "%";
+    $("quota").textContent = `${pctTxt} · ${u.toLocaleString("pt-BR")} de 10.000`;
+    $("meter").style.width = pct + "%";
+    const chip = $("quotaChip");
+    if (chip){ chip.innerHTML = `<i><b style="width:${pct}%"></b></i>${pctTxt} da cota`; chip.className = "qchip" + (pct >= 85 ? " high" : pct >= 60 ? " mid" : ""); }
+    document.querySelectorAll(".liveq").forEach(n => n.textContent = `Cota usada hoje: ${pctTxt} (${u.toLocaleString("pt-BR")} de 10.000)`);
+  }
 
   // ---------- API ----------
   class ApiError extends Error { constructor(reason, msg){ super(msg); this.reason = reason; } }
@@ -488,7 +503,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   function scanner(text){
     const w = el("div",{class:"scan"});
     w.innerHTML = '<svg width="90" height="90" viewBox="0 0 90 90" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" opacity=".25"><circle cx="45" cy="45" r="40"/><circle cx="45" cy="45" r="22"/></g><path class="sweep" d="M45 45 L45 5 A40 40 0 0 1 80 25 Z" fill="#FFB020" opacity=".85"/><circle cx="45" cy="45" r="3.5" fill="currentColor"/></svg>';
-    const p = el("span",{}, text); w.append(p); return { node: w, set: (t) => p.textContent = t };
+    const p = el("span",{}, text); const q = el("span",{class:"liveq"}); w.append(p, q); setTimeout(paintQuota); return { node: w, set: (t) => p.textContent = t };
   }
   function showForm(){ $("form").hidden = false; $("results").hidden = true; $("cta").hidden = false; window.scrollTo(0,0); }
   function showResults(){ $("form").hidden = true; $("results").hidden = false; $("cta").hidden = true; window.scrollTo(0,0); }
@@ -922,6 +937,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   $("go").addEventListener("click", run);
   $("saveKey").addEventListener("click", saveKey);
   $("addChan").addEventListener("click", addChannel);
+  $("quotaChip").addEventListener("click", () => switchView("ajustes"));
+  setInterval(paintQuota, 60000);
   renderChannels();
   $("toSettings").addEventListener("click", () => switchView("ajustes"));
   $("scrim").addEventListener("click", closeSheet);
