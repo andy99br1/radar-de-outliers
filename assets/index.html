@@ -216,6 +216,7 @@ ol.steps{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;ga
 code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}
 
 .chanlist{display:flex;flex-direction:column;gap:14px}
+.newtag{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--amber);color:var(--on-amber);border-radius:6px;padding:1px 6px;vertical-align:1px}
 .chancat{display:flex;flex-direction:column;gap:6px}
 .chancat h4{margin:0;font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .chanrow{display:flex;align-items:center;gap:10px;background:var(--raised);border-radius:12px;padding:8px 8px 8px 12px;font-size:14px}
@@ -260,6 +261,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
           <div class="field"><label for="format">Formato</label><select id="format"><option value="long">Vídeo longo</option><option value="short">Shorts</option></select></div>
           <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
           <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
+          <div class="field full"><label for="discover">Canais novos do tema</label><select id="discover"><option value="on">Procurar também canais novos</option><option value="off">Só os canais que acompanho</option></select></div>
         </div>
       </details>
       <div class="note" id="status" hidden></div>
@@ -345,6 +347,9 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     { id:"sleep", name:"Ciência p/ dormir", c:["#020617","#4338CA"], icon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>' },
     { id:"general", name:"Curiosidades", c:["#312E81","#F59E0B"], icon:'<rect x="3" y="13" width="5" height="7" rx="1"/><rect x="10" y="9" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>' }
   ];
+  // Termos usados só para DESCOBRIR canais novos do tema (os vídeos são avaliados pela média do próprio canal).
+  const DISCOVER = { whatif:"what if", space:"space universe explained", body:"human body explained", mind:"psychology explained",
+    earth:"prehistoric earth history", physics:"physics explained", sleep:"science for sleep", general:"explained animation" };
   // Canais iniciais: os que apareceram como outliers no vidIQ + alguns grandes do nicho.
   const DEFAULT_CHANNELS = [
     ["UCrGDUlj_hjaNz97jdXCOReA","All Answers",["whatif"]], ["UCgYSQsRS3Mz6q0FDDuuILiw","Blotwise",["whatif"]], ["UCkhJeR5N7UpVwklhiBAISMQ","Brain Cipher",["whatif"]],
@@ -471,9 +476,11 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   function greet(){ const h = new Date().getHours(); $("hello").textContent = h < 5 ? "Boa noite" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; }
   const selectedChannels = () => channels.filter(c => c.cats.some(k => picked.has(k)));
   function updateCost(){
-    const n = selectedChannels().length;
-    $("cost").textContent = n ? `${n} ${n>1?"canais":"canal"} · cerca de ${(n*2 + 2).toLocaleString("pt-BR")} das 10.000 unidades grátis de hoje` : (picked.size ? "Essas categorias não têm canais. Adicione em Ajustes." : "Escolha pelo menos uma categoria");
-    $("go").disabled = busy || !n;
+    const n = selectedChannels().length, disc = $("discover").value === "on" ? [...picked].filter(k => DISCOVER[k]).length : 0;
+    const units = n*2 + 2 + disc*150;
+    $("cost").textContent = !picked.size ? "Escolha pelo menos uma categoria" :
+      `${n} ${n===1?"canal":"canais"}${disc ? " + canais novos" : ""} · cerca de ${units.toLocaleString("pt-BR")} das 10.000 unidades grátis de hoje`;
+    $("go").disabled = busy || (!n && !disc);
   }
 
   // ---------- busca ----------
@@ -500,7 +507,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     const from = $("from").value, to = $("to").value;
     if (!from || !to || from > to){ showStatus("Confira as datas: o início precisa ser antes do fim.", true); return; }
     const list = selectedChannels();
-    if (!list.length) return;
+    const discover = $("discover").value === "on";
+    if (!list.length && !discover) return;
     busy = true; updateCost(); showStatus("");
     showResults();
     const res = $("results"); res.innerHTML = ""; const sc = scanner(`Lendo ${list.length} canais…`); res.append(sc.node);
@@ -510,6 +518,25 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       for (const c of list){ if (!/^UC[\w-]{22}$/.test(c.ref)){ const id = await resolveHandle(c.ref).catch(e => { if (/quota/i.test(e.reason)) throw e; return null; }); if (id){ c.ref = id; saveChannels(); } } }
       const catsOf = new Map();
       for (const c of list) if (/^UC/.test(c.ref)) catsOf.set(c.ref, [...new Set([...(catsOf.get(c.ref) || []), ...c.cats])]);
+      // Descoberta: busca ampla por categoria só para achar canais que ainda não estão na lista.
+      const newCh = new Map();
+      if (discover){
+        const after = new Date(fromT).toISOString(), before = new Date(toT).toISOString();
+        for (const k of [...picked].filter(k => DISCOVER[k])){
+          sc.set(`Procurando canais novos: ${TOPICS.find(t => t.id === k)?.name}…`);
+          try {
+            const r = await yt("search", { part:"snippet", type:"video", q: DISCOVER[k], maxResults:"50", order:"viewCount", publishedAfter: after, publishedBefore: before,
+              relevanceLanguage:"en", videoDuration: fmt === "short" ? "short" : (k === "sleep" ? "long" : "medium") });
+            let added = 0;
+            for (const it of r.items || []){
+              const cid = it.snippet?.channelId; if (!cid || catsOf.has(cid)) continue;
+              if (!newCh.has(cid)){ if (added >= 25) continue; newCh.set(cid, []); added++; }
+              if (!newCh.get(cid).includes(k)) newCh.get(cid).push(k);
+            }
+          } catch (e) { if (/quota/i.test(e.reason)) throw e; }
+        }
+        for (const [cid, cats] of newCh) catsOf.set(cid, cats);
+      }
       const ids = [...catsOf.keys()], chans = new Map();
       for (const part of chunk(ids, 50)){
         const r = await yt("channels", { part:"snippet,statistics,contentDetails", id: part.join(",") });
@@ -520,7 +547,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       }
       for (const c of list){ if (chans.has(c.ref)) delete c.bad; else c.bad = true; }
       saveChannels();
-      diag = { channels: chans.size, missing: list.filter(c => c.bad).length, recent: 0, format: 0, views: 0, breakout: 0, minB, minV };
+      for (const cid of newCh.keys()){ const ch = chans.get(cid); if (ch) ch.isNew = true; }
+      diag = { channels: chans.size, fresh: [...newCh.keys()].filter(id => chans.has(id)).length, missing: list.filter(c => c.bad).length, recent: 0, format: 0, views: 0, breakout: 0, minB, minV };
       let done = 0;
       await pool([...chans.keys()], 5, async (cid) => {
         const ch = chans.get(cid);
@@ -556,7 +584,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
           const life = ch.total > 0 && ch.totalViews > 0 ? (ch.totalViews / ch.total) * curve(ageDays) : null;
           const baseline = atAge.length >= 4 && med > 0 ? med : life;
           cands.push({ id: v.id, title: v.title, channelId: cid, channel: ch.title, subs: ch.subs, published: new Date(v.at).toISOString(), sec: v.sec, views: v.views,
-            thumb: v.thumb, topics: catsOf.get(cid) || [], baseline, breakout: baseline ? v.views / baseline : null,
+            thumb: v.thumb, topics: catsOf.get(cid) || [], isNew: !!ch.isNew, baseline, breakout: baseline ? v.views / baseline : null,
             vph: v.views / Math.max(1, (now - v.at) / 3600000), br: store.get("br." + v.id, null) });
         }
       }
@@ -588,7 +616,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     if (!videos.length){
       const lines = [];
       if (diag){
-        lines.push(`Li ${diag.channels} ${diag.channels === 1 ? "canal" : "canais"}${diag.missing ? ` (${diag.missing} não ${diag.missing>1?"foram encontrados":"foi encontrado"}, confira em Ajustes)` : ""}. ${diag.recent} ${diag.recent === 1 ? "vídeo foi publicado" : "vídeos foram publicados"} no período.`);
+        lines.push(`Li ${diag.channels} ${diag.channels === 1 ? "canal" : "canais"}${diag.fresh ? `, ${diag.fresh} ${diag.fresh === 1 ? "novo" : "novos"}` : ""}${diag.missing ? ` (${diag.missing} não ${diag.missing>1?"foram encontrados":"foi encontrado"}, confira em Ajustes)` : ""}. ${diag.recent} ${diag.recent === 1 ? "vídeo foi publicado" : "vídeos foram publicados"} no período.`);
         if (diag.format) lines.push(`${diag.format} ${diag.format>1?"cortados":"cortado"} pelo formato (${$("format").value === "short" ? "não eram Shorts" : "eram Shorts, vídeos de até 3 min ou lives"}).`);
         if (diag.views) lines.push(`${diag.views} ${diag.views>1?"tinham":"tinha"} menos de ${short(diag.minV)} views.`);
         if (diag.breakout) lines.push(`${diag.breakout} ${diag.breakout>1?"ficaram":"ficou"} abaixo de ${diag.minB}× a média do canal.`);
@@ -668,7 +696,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
           el("div",{}, el("b",{}, short(v.views)), el("span",{},"views")),
           el("div",{}, el("b",{}, short(v.vph) + "/h"), el("span",{},"ritmo")),
           el("div",{}, el("b",{}, ago(v.published).replace("há ","")), el("span",{},"no ar"))),
-        el("div",{class:"chan"}, el("b",{}, v.channel), v.subs != null ? ` · ${short(v.subs)} inscritos` : "", v.baseline ? ` · média do canal ${short(v.baseline)}` : ""),
+        el("div",{class:"chan"}, el("b",{}, v.channel), v.isNew ? el("span",{class:"newtag"},"canal novo") : null, v.subs != null ? ` · ${short(v.subs)} inscritos` : "", v.baseline ? ` · média do canal ${short(v.baseline)}` : ""),
+        v.isNew ? followBtn(v) : null,
         brArea)
     ];
   }
@@ -690,7 +719,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     for (const v of (withHero ? rest : list)) rows.append(el("li",{}, el("button",{class:"mini",type:"button",onclick:()=>openSheet(v)},
       el("span",{class:"th"}, v.thumb ? el("img",{src:v.thumb,alt:"",loading:"lazy"}) : null),
       el("span",{}, el("span",{class:"xx"}, v.breakout != null ? fmtMult(v.breakout) : "—"), el("span",{class:"tt"}, decode(v.title)),
-        el("span",{class:"mm"}, v.br?.verdict ? el("span",{class:"dot " + v.br.verdict}) : null, `${v.channel} · ${short(v.views)}`)))));
+        el("span",{class:"mm"}, v.br?.verdict ? el("span",{class:"dot " + v.br.verdict}) : null, `${v.channel}${v.isNew ? " · canal novo" : ""} · ${short(v.views)}`)))));
     res.append(rows);
   }
 
@@ -705,6 +734,15 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     $("sheet").hidden = false; p.scrollTop = 0;
   }
   function closeSheet(){ $("sheet").hidden = true; sheetVideo = null; if (!$("results").hidden && mode === "list") renderResults(); }
+
+  function followBtn(v){
+    const following = () => channels.some(c => c.ref === v.channelId);
+    const b = el("button",{class:"brbtn",type:"button",onclick:()=>{
+      if (!following()){ channels.push({ ref: v.channelId, name: v.channel, cats: (v.topics && v.topics.length ? v.topics : ["general"]) }); store.set("chname." + v.channelId, v.channel); saveChannels(); renderChannels(); paintTiles(); updateCost(); }
+      b.firstChild.textContent = "Acompanhando este canal"; b.lastChild.textContent = "está na sua lista"; }},
+      following() ? "Acompanhando este canal" : "Acompanhar este canal", el("span",{}, following() ? "está na sua lista" : "entra nas próximas buscas"));
+    return b;
+  }
 
   // ---------- Brasil ----------
   const VERD = { livre:["livre","Livre no Brasil"], fraca:["fraca","Só versões fracas no Brasil"], feito:["feito","Já feito no Brasil"] };
@@ -855,8 +893,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   applyTheme();
   try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch {}
   document.querySelectorAll("#themeSeg button").forEach(b => b.addEventListener("click", () => { store.set("theme", b.dataset.theme); applyTheme(); }));
-  const defaults = { format:"long", minb:"2", minv:"5000" };
-  for (const id of Object.keys(defaults)){ $(id).value = store.get("opt."+id, defaults[id]); $(id).addEventListener("change", () => store.set("opt."+id, $(id).value)); }
+  const defaults = { format:"long", minb:"2", minv:"5000", discover:"on" };
+  for (const id of Object.keys(defaults)){ $(id).value = store.get("opt."+id, defaults[id]); $(id).addEventListener("change", () => { store.set("opt."+id, $(id).value); updateCost(); }); }
   greet(); paintTiles(); setPeriod(period);
   document.querySelectorAll("#period .chip").forEach(b => b.addEventListener("click", () => setPeriod(b.dataset.days)));
   $("apikey").value = store.get("apikey", "");
