@@ -352,6 +352,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   <div class="more-in">
           <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
           <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
+          <div class="field full"><label for="onlyEn">Idioma dos vídeos</label><select id="onlyEn"><option value="on">Só vídeos em inglês</option><option value="off">Qualquer idioma</option></select></div>
+          <div class="field full"><label for="excludeWords">Palavras para excluir (separadas por vírgula)</label><textarea id="excludeWords" rows="2" spellcheck="false" style="background:var(--raised);border:1.5px solid transparent;border-radius:12px;padding:10px 12px;width:100%;font:inherit;font-size:14px;color:inherit;resize:vertical"></textarea></div>
           <div class="field full"><label for="storyTerms">Termos de historinha (em inglês, um por linha)</label><textarea id="storyTerms" rows="3" spellcheck="false" style="background:var(--raised);border:1.5px solid transparent;border-radius:12px;padding:10px 12px;width:100%;font:inherit;font-size:14px;color:inherit;resize:vertical"></textarea></div>
           <div class="field full"><label for="discover">Canais novos do tema</label><select id="discover"><option value="on">Procurar também canais novos</option><option value="off">Só os canais que acompanho</option></select></div>
         </div>
@@ -380,7 +382,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   const DISCOVER = { whatif:"what if", space:"space universe explained", body:"human body explained", mind:"psychology explained",
     earth:"prehistoric earth history", physics:"physics explained", sleep:"science for sleep", general:"explained animation", story:"true story animated" };
   // Termos padrão para Shorts de historinha (histórias reais narradas com animação 3D simples). Editáveis em Filtros.
-  const STORY_TERMS = "true story animated\nthis man survived\nincredible true story 3d animation";
+  const STORY_TERMS = "true story animation\nhistory animation shorts\nhe survived animation";
   const storyTerms = () => ($("storyTerms").value || STORY_TERMS).split("\n").map(t => t.trim()).filter(Boolean).slice(0, 5);
   // Tipos de vídeo (lista de marcar na tela de busca)
   const TYPES = [
@@ -389,6 +391,24 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     { id:"short", name:"Shorts", hint:"até 3 min", dur:"short" },
     { id:"story", name:"Shorts de historinha", hint:"histórias animadas curtas · categoria Historinhas", dur:"short" }
   ];
+  // Detecta se um título está em inglês: idioma informado pelo YouTube primeiro; senão, olha o próprio título.
+  const EN_WORDS = new Set("the a an you your what if how why who when this that with of and to in is was are be it its i my he she they we his her their from for on at by can will would could do does did not never every most first last into after before about".split(" "));
+  const OTHER_WORDS = new Set("el la los las del que y en por para con una uno como qué cómo cuando porque muy más pero sus es son fue o não nao você voce com uma um isso esse essa seu sua os as dos das ao der die das und ist ein eine nicht mit für auf le les des est une un pas avec pour dans qui sur il elle mais ce cette di il della che non per una sono hai ki ke ka kya bhai kahani nahi aur mein hain yeh woh e ele ela sem em na nos pelo pela foi estava depois minutos".split(" "));
+  const EXCLUDE_DEFAULT = "horror, scary, creepy, ghost, haunted, hindi, kahani";
+  const excludeList = () => ($("excludeWords").value || "").split(/[,\n]/).map(w => w.trim().toLowerCase()).filter(Boolean);
+  const excluded = (title) => { const t = " " + String(title || "").toLowerCase() + " "; return excludeList().some(w => t.includes(w)); };
+  const SOUTH_ASIA = new Set(["IN","PK","BD","NP","LK"]);
+  function isEnglish(title, lang){
+    if (lang) return /^en/i.test(lang);
+    const t = String(title || "");
+    if (/[\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/.test(t)) return false;
+    const w = t.toLowerCase().normalize("NFC").split(/[^a-zà-ÿ']+/).filter(Boolean);
+    let en = 0, other = 0; for (const x of w){ if (EN_WORDS.has(x)) en++; if (OTHER_WORDS.has(x)) other++; }
+    const accents = (t.match(/[áàâãéêíóôõúçñüß]/gi) || []).length;
+    if (other >= 2 && other > en) return false;
+    if (accents >= 2 && en === 0) return false;
+    return true;
+  }
   const bucketOf = (sec) => sec == null ? "long" : sec <= 180 ? "short" : sec <= 1200 ? "long" : "xlong";
   // Canais iniciais: os que apareceram como outliers no vidIQ + alguns grandes do nicho.
   const DEFAULT_CHANNELS = [
@@ -580,7 +600,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     busy = true; updateCost(); showStatus("");
     showResults();
     const res = $("results"); res.innerHTML = ""; const sc = scanner(`Lendo ${list.length} canais…`); res.append(sc.node);
-    const minV = +$("minv").value, minB = +$("minb").value;
+    const minV = +$("minv").value, minB = +$("minb").value, onlyEn = $("onlyEn").value === "on";
     if (!types.size){ busy = false; showForm(); showStatus("Marque pelo menos um tipo de vídeo.", true); return; }
     const fromT = new Date(from + "T00:00:00").getTime(), toT = new Date(to + "T23:59:59").getTime();
     try {
@@ -599,10 +619,12 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
           sc.set(`Procurando canais novos: ${TOPICS.find(t => t.id === k)?.name}…`);
           try {
             const r = await yt("search", { part:"snippet", type:"video", q: term || DISCOVER[k], maxResults:"50", order:"viewCount", publishedAfter: after, publishedBefore: before,
-              relevanceLanguage:"en", videoDuration: dur });
+              relevanceLanguage:"en", regionCode:"US", videoDuration: dur });
             let added = 0;
             for (const it of r.items || []){
               const cid = it.snippet?.channelId; if (!cid || catsOf.has(cid)) continue;
+              if (onlyEn && !isEnglish(it.snippet?.title, "")) continue;
+              if (excluded(it.snippet?.title)) continue;
               if (!newCh.has(cid)){ if (added >= 25) continue; newCh.set(cid, []); added++; }
               if (!newCh.get(cid).includes(k)) newCh.get(cid).push(k);
             }
@@ -614,14 +636,14 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       for (const part of chunk(ids, 50)){
         const r = await yt("channels", { part:"snippet,statistics,contentDetails", id: part.join(",") });
         for (const c of r.items || []){
-          chans.set(c.id, { title: c.snippet?.title || "", subs: c.statistics?.hiddenSubscriberCount ? null : +(c.statistics?.subscriberCount || 0), uploads: c.contentDetails?.relatedPlaylists?.uploads, total: +(c.statistics?.videoCount || 0), totalViews: +(c.statistics?.viewCount || 0) });
+          chans.set(c.id, { title: c.snippet?.title || "", lang: c.snippet?.defaultLanguage || "", country: c.snippet?.country || "", subs: c.statistics?.hiddenSubscriberCount ? null : +(c.statistics?.subscriberCount || 0), uploads: c.contentDetails?.relatedPlaylists?.uploads, total: +(c.statistics?.videoCount || 0), totalViews: +(c.statistics?.viewCount || 0) });
           if (c.snippet?.title) store.set("chname." + c.id, c.snippet.title);
         }
       }
       for (const c of list){ if (chans.has(c.ref)) delete c.bad; else c.bad = true; }
       saveChannels();
       for (const cid of newCh.keys()){ const ch = chans.get(cid); if (ch) ch.isNew = true; }
-      diag = { channels: chans.size, fresh: [...newCh.keys()].filter(id => chans.has(id)).length, missing: list.filter(c => c.bad).length, recent: 0, format: 0, views: 0, breakout: 0, minB, minV };
+      diag = { channels: chans.size, fresh: [...newCh.keys()].filter(id => chans.has(id)).length, missing: list.filter(c => c.bad).length, recent: 0, lang: 0, excl: 0, format: 0, views: 0, breakout: 0, minB, minV };
       let done = 0;
       await pool([...chans.keys()], 5, async (cid) => {
         const ch = chans.get(cid);
@@ -631,7 +653,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
             const vids = (pl.items || []).map(i => i.contentDetails?.videoId).filter(Boolean);
             if (vids.length){
               const r = await yt("videos", { part:"statistics,contentDetails,snippet", id: vids.join(",") });
-              ch.recent = (r.items || []).map(v => ({ id: v.id, title: v.snippet?.title || "", views: +(v.statistics?.viewCount || 0), sec: secs(v.contentDetails?.duration),
+              ch.recent = (r.items || []).map(v => ({ id: v.id, title: v.snippet?.title || "", lang: v.snippet?.defaultAudioLanguage || v.snippet?.defaultLanguage || "", views: +(v.statistics?.viewCount || 0), sec: secs(v.contentDetails?.duration),
                 at: Date.parse(v.snippet?.publishedAt), live: !!(v.snippet?.liveBroadcastContent && v.snippet.liveBroadcastContent !== "none"),
                 thumb: v.snippet?.thumbnails?.high?.url || v.snippet?.thumbnails?.medium?.url || "" }));
             }
@@ -647,6 +669,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
         for (const v of ch.recent || []){
           if (!(v.at >= fromT && v.at <= toT)) continue;
           diag.recent++;
+          if (onlyEn && (SOUTH_ASIA.has(ch.country) || !(isEnglish(v.title, v.lang) && (!ch.lang || /^en/i.test(ch.lang) || v.lang)))){ diag.lang++; continue; }
+          if (excluded(v.title)){ diag.excl++; continue; }
           const bk = bucketOf(v.sec);
           const okType = types.has(bk) || (bk === "short" && types.has("story") && (catsOf.get(cid) || []).includes("story"));
           if (v.live || !okType){ diag.format++; continue; }
@@ -693,6 +717,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       const lines = [];
       if (diag){
         lines.push(`Li ${diag.channels} ${diag.channels === 1 ? "canal" : "canais"}${diag.fresh ? `, ${diag.fresh} ${diag.fresh === 1 ? "novo" : "novos"}` : ""}${diag.missing ? ` (${diag.missing} não ${diag.missing>1?"foram encontrados":"foi encontrado"}, confira em Ajustes)` : ""}. ${diag.recent} ${diag.recent === 1 ? "vídeo foi publicado" : "vídeos foram publicados"} no período.`);
+        if (diag.lang) lines.push(`${diag.lang} ${diag.lang>1?"estavam":"estava"} em outro idioma ou ${diag.lang>1?"eram":"era"} de canais do sul da Ásia.`);
+        if (diag.excl) lines.push(`${diag.excl} ${diag.excl>1?"tinham":"tinha"} palavras da sua lista de exclusão.`);
         if (diag.format) lines.push(`${diag.format} ${diag.format>1?"eram":"era"} de um tipo que você não marcou (ou live).`);
         if (diag.views) lines.push(`${diag.views} ${diag.views>1?"tinham":"tinha"} menos de ${short(diag.minV)} views.`);
         if (diag.breakout) lines.push(`${diag.breakout} ${diag.breakout>1?"ficaram":"ficou"} abaixo de ${diag.minB}× a média do canal.`);
@@ -767,7 +793,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
         v.sec != null ? el("span",{class:"dur"}, durText(v.sec)) : null),
       el("div",{class:"cbody"},
         el("p",{class:"ttl"}, decode(v.title)),
-        el("p",{class:"pt", "data-pt": v.id}, ptTitle(v)),
+        el("p",{class:"pt", "data-pt": v.id}, ptLabel(v)),
         el("div",{class:"stats"},
           el("div",{}, el("b",{}, short(v.views)), el("span",{},"views")),
           el("div",{}, el("b",{}, short(v.vph) + "/h"), el("span",{},"ritmo")),
@@ -788,7 +814,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       res.append(el("button",{class:"hero",type:"button",onclick:()=>openSheet(first)},
         first.thumb ? el("img",{src:first.thumb,alt:""}) : null, el("span",{class:"g"}),
         first.breakout != null ? el("span",{class:"x"}, fmtMult(first.breakout)) : null,
-        el("span",{class:"txt"}, el("span",{class:"t1"}, decode(first.title)), el("span",{class:"t2"}, ptTitle(first)),
+        el("span",{class:"txt"}, el("span",{class:"t1"}, decode(first.title)), el("span",{class:"t2","data-pt":first.id}, ptLabel(first)),
           el("span",{class:"tags"}, el("span",{class:"tag"}, first.channel), el("span",{class:"tag"}, short(first.views) + " views"), first.br?.verdict ? el("span",{class:"tag " + first.br.verdict}, VERD[first.br.verdict][1]) : null))));
     }
     const rows = el("ul",{class:"rows"});
@@ -830,12 +856,18 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   }
   // Tradução dos títulos: serviço de tradução do Google (sem chave), guardada no celular. O dicionário é só reserva.
   const ptCache = new Map(Object.entries(store.get("ptTitles", {})));
-  function ptTitle(v){ const t = (v.br && v.br.query) || ptCache.get(v.id) || draftPT(v.title); return t ? t.charAt(0).toUpperCase() + t.slice(1) : ""; }
+  const cap = (t) => t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
+  // para a busca "Existe no Brasil?" (precisa de algum texto em português)
+  function ptTitle(v){ return cap((v.br && v.br.query) || ptCache.get(v.id) || draftPT(v.title)); }
+  // para mostrar na tela: só tradução de verdade; nunca o rascunho do dicionário
+  const ptFailed = new Set();
+  function ptLabel(v){ const t = (v.br && v.br.query) || ptCache.get(v.id); return t ? cap(t) : (ptFailed.has(v.id) ? "" : "Traduzindo…"); }
   async function gtranslate(text){
-    const r = await httpGet("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=pt&dt=t&q=" + encodeURIComponent(text));
-    if (r.status !== 200) throw new Error("tradução " + r.status);
-    const j = JSON.parse(r.body);
-    return (j[0] || []).map(x => x[0] || "").join("");
+    const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=pt-BR&dt=t&q=" + encodeURIComponent(text);
+    const parse = (body) => { const j = JSON.parse(body); const out = (j[0] || []).map(x => x[0] || "").join(""); if (!out) throw new Error("vazio"); return out; };
+    try { const r = await httpGet(url); if (r.status === 200) return parse(r.body); } catch {}
+    const r2 = await fetch(url); if (!r2.ok) throw new Error("tradução " + r2.status);
+    return parse(await r2.text());
   }
   async function translateTitles(list){
     const need = list.filter(v => v && v.id && !ptCache.has(v.id));
@@ -844,9 +876,10 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
         const out = (await gtranslate(part.map(v => decode(v.title).replace(/\n/g, " ")).join("\n"))).split("\n");
         if (out.length === part.length) part.forEach((v, i) => { if (out[i].trim()) ptCache.set(v.id, out[i].trim()); });
         else for (const v of part){ try { const t = (await gtranslate(decode(v.title))).trim(); if (t) ptCache.set(v.id, t); } catch {} }
-      } catch { return; }
+      } catch { part.forEach(v => ptFailed.add(v.id)); }
+      part.forEach(v => { if (!ptCache.has(v.id)) ptFailed.add(v.id); });
       store.set("ptTitles", Object.fromEntries([...ptCache].slice(-800)));
-      document.querySelectorAll("[data-pt]").forEach(n => { const id = n.getAttribute("data-pt"); const v = list.find(x => x.id === id); if (v && ptCache.has(id) && !(v.br && v.br.query)) n.textContent = ptTitle(v); });
+      document.querySelectorAll("[data-pt]").forEach(n => { const id = n.getAttribute("data-pt"); const v = list.find(x => x.id === id); if (v) n.textContent = ptLabel(v); });
     }
   }
   const STOP = new Set("o a os as um uma uns umas de do da dos das e ou que se em no na nos nas por para com sem como é são seu sua seus suas você voce isso esse essa este esta ao aos à às mais muito the of and to in what if how why your you is are".split(" "));
@@ -873,7 +906,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   async function checkBR(v, query, box){
     if (!query) return;
     v.br = { loading: true, query }; paintBR(box, v);
-    document.querySelectorAll(`[data-pt="${v.id}"]`).forEach(n => n.textContent = ptTitle(v));
+    document.querySelectorAll(`[data-pt="${v.id}"]`).forEach(n => n.textContent = ptLabel(v));
     try {
       const r = await yt("search", { part:"snippet", type:"video", q: query, maxResults:"15", regionCode:"BR", relevanceLanguage:"pt", order:"relevance" });
       const ids = (r.items || []).map(i => i.id?.videoId).filter(Boolean);
@@ -991,9 +1024,11 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   applyTheme();
   try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch {}
   document.querySelectorAll("#themeSeg button").forEach(b => b.addEventListener("click", () => { store.set("theme", b.dataset.theme); applyTheme(); }));
-  const defaults = { minb:"2", minv:"5000", discover:"on" };
-  $("storyTerms").value = store.get("storyTerms", STORY_TERMS);
-  $("storyTerms").addEventListener("input", () => { store.set("storyTerms", $("storyTerms").value); updateCost(); });
+  const defaults = { minb:"2", minv:"5000", discover:"on", onlyEn:"on" };
+  $("storyTerms").value = store.get("storyTerms2", STORY_TERMS);
+  $("excludeWords").value = store.get("excludeWords", EXCLUDE_DEFAULT);
+  $("excludeWords").addEventListener("input", () => store.set("excludeWords", $("excludeWords").value));
+  $("storyTerms").addEventListener("input", () => { store.set("storyTerms2", $("storyTerms").value); updateCost(); });
   for (const id of Object.keys(defaults)){ $(id).value = store.get("opt."+id, defaults[id]); $(id).addEventListener("change", () => { store.set("opt."+id, $(id).value); updateCost(); }); }
   greet(); paintTypes(); paintTiles(); setPeriod(period);
   document.querySelectorAll("#period .chip").forEach(b => b.addEventListener("click", () => setPeriod(b.dataset.days)));

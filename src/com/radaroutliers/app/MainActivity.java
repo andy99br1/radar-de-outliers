@@ -157,6 +157,7 @@ public class MainActivity extends Activity {
                     c.setConnectTimeout(15000);
                     c.setReadTimeout(30000);
                     c.setRequestProperty("Accept", "application/json");
+                    if (url.startsWith("https://translate.googleapis.com/")) c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36");
                     c.setRequestProperty("X-Android-Package", getPackageName());
                     if (!certSha1.isEmpty()) c.setRequestProperty("X-Android-Cert", certSha1);
                     int code = c.getResponseCode();
