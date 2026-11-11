@@ -81,6 +81,16 @@ details.more[open] summary::after{transform:rotate(-135deg) translateY(-2px)}
 
 .cta{position:fixed;left:0;right:0;bottom:66px;z-index:8;padding:12px 16px 12px;background:linear-gradient(180deg,transparent,var(--bg) 35%)}
 .cta-in{max-width:568px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
+.checks{display:flex;flex-direction:column;background:var(--card);border-radius:18px;overflow:hidden}
+.checks h3{margin:0;padding:12px 16px 4px;font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.check{display:flex;align-items:center;gap:12px;padding:11px 16px;text-align:left;width:100%;border-top:1px solid var(--line)}
+.check:first-of-type{border-top:0}
+.check .box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;flex:none;color:var(--on-amber)}
+.check .box svg.i{width:16px;height:16px;stroke-width:3.4;opacity:0}
+.check[aria-checked="true"] .box{background:var(--amber);border-color:var(--amber)}
+.check[aria-checked="true"] .box svg.i{opacity:1}
+.check b{display:block;font-weight:700;font-size:15px}
+.check small{display:block;font-size:12.5px;color:var(--muted)}
 .ctarow{display:flex;gap:10px;align-items:stretch}
 .fbtn{position:relative;flex:none;display:flex;align-items:center;gap:7px;background:var(--card);border-radius:18px;padding:0 16px;font-weight:700;font-size:15px}
 .fdot{position:absolute;top:10px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--amber)}
@@ -268,6 +278,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       </div>
       <div class="note" id="needKey" hidden>Para começar, cadastre sua chave grátis da API do YouTube em <button class="lnk" type="button" id="toSettings">Ajustes</button>.</div>
       <button class="note" type="button" id="lastBtn" hidden style="text-align:left;width:100%"></button>
+      <div class="checks" id="types" role="group" aria-label="Tipo de vídeo"></div>
       <div class="tiles" id="tiles"></div>
       <div class="note" id="status" hidden></div>
       <div class="cta" id="cta"><div class="cta-in"><div class="ctarow"><button class="fbtn" id="filtersBtn" type="button" aria-label="Filtros"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Filtros<span class="fdot" id="fdot" hidden></span></button><button class="go" id="go" type="button">Buscar outliers</button></div><div class="cost" id="cost"></div></div></div>
@@ -336,7 +347,6 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
 <div class="sheet" id="fsheet" hidden><div class="scrim" id="fscrim"></div><div class="panel fpanel">
   <div class="fhead"><h3>Filtros</h3><button class="btn" id="fdone" type="button">Pronto</button></div>
   <div class="more-in">
-          <div class="field"><label for="format">Formato</label><select id="format"><option value="long">Vídeo longo</option><option value="short">Shorts</option></select></div>
           <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
           <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
           <div class="field full"><label for="discover">Canais novos do tema</label><select id="discover"><option value="on">Procurar também canais novos</option><option value="off">Só os canais que acompanho</option></select></div>
@@ -359,11 +369,20 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     { id:"earth", name:"Terra e pré-história", c:["#064E3B","#B45309"], icon:'<circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z"/>' },
     { id:"physics", name:"Física e escala", c:["#0C4A6E","#06B6D4"], icon:'<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)"/>' },
     { id:"sleep", name:"Ciência p/ dormir", c:["#020617","#4338CA"], icon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>' },
+    { id:"story", name:"Historinhas", c:["#7C2D12","#EC4899"], icon:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>' },
     { id:"general", name:"Curiosidades", c:["#312E81","#F59E0B"], icon:'<rect x="3" y="13" width="5" height="7" rx="1"/><rect x="10" y="9" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>' }
   ];
   // Termos usados só para DESCOBRIR canais novos do tema (os vídeos são avaliados pela média do próprio canal).
   const DISCOVER = { whatif:"what if", space:"space universe explained", body:"human body explained", mind:"psychology explained",
-    earth:"prehistoric earth history", physics:"physics explained", sleep:"science for sleep", general:"explained animation" };
+    earth:"prehistoric earth history", physics:"physics explained", sleep:"science for sleep", general:"explained animation", story:"animated story" };
+  // Tipos de vídeo (lista de marcar na tela de busca)
+  const TYPES = [
+    { id:"long", name:"Vídeo longo", hint:"de 4 a 20 min", dur:"medium" },
+    { id:"xlong", name:"Vídeo bem longo", hint:"mais de 20 min · documentários e ciência p/ dormir", dur:"long" },
+    { id:"short", name:"Shorts", hint:"até 3 min", dur:"short" },
+    { id:"story", name:"Shorts de historinha", hint:"histórias animadas curtas · categoria Historinhas", dur:"short" }
+  ];
+  const bucketOf = (sec) => sec == null ? "long" : sec <= 180 ? "short" : sec <= 1200 ? "long" : "xlong";
   // Canais iniciais: os que apareceram como outliers no vidIQ + alguns grandes do nicho.
   const DEFAULT_CHANNELS = [
     ["UCrGDUlj_hjaNz97jdXCOReA","All Answers",["whatif"]], ["UCgYSQsRS3Mz6q0FDDuuILiw","Blotwise",["whatif"]], ["UCkhJeR5N7UpVwklhiBAISMQ","Brain Cipher",["whatif"]],
@@ -496,13 +515,24 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     $("headline").innerHTML = 'O que estourou <em>lá fora</em> ' + PERIOD_TXT[p] + '?';
   }
   function greet(){ const h = new Date().getHours(); $("hello").textContent = h < 5 ? "Boa noite" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; }
-  const selectedChannels = () => channels.filter(c => c.cats.some(k => picked.has(k)));
+  let types = new Set(store.get("types", ["long"]));
+  const activeCats = () => { const a = new Set(picked); if (types.has("story")) a.add("story"); return a; };
+  const selectedChannels = () => { const a = activeCats(); return channels.filter(c => c.cats.some(k => a.has(k))); };
+  function paintTypes(){
+    const box = $("types"); box.innerHTML = "";
+    box.append(el("h3",{},"Tipo de vídeo"));
+    for (const t of TYPES) box.append(el("button",{class:"check",type:"button",role:"checkbox","aria-checked":String(types.has(t.id)),onclick:()=>{
+      types.has(t.id) ? types.delete(t.id) : types.add(t.id); store.set("types",[...types]); paintTypes(); updateCost(); }},
+      el("span",{class:"box"}, icon("check")), el("span",{}, el("b",{}, t.name), el("small",{}, t.hint))));
+  }
   function updateCost(){
-    const n = selectedChannels().length, disc = $("discover").value === "on" ? [...picked].filter(k => DISCOVER[k]).length : 0;
-    const units = n*2 + 2 + disc*150;
-    $("cost").textContent = !picked.size ? "Escolha pelo menos uma categoria" :
+    const durs = new Set([...types].filter(t => t !== "story").map(t => TYPES.find(x => x.id === t).dur));
+    const n = selectedChannels().length, on = $("discover").value === "on";
+    const disc = on ? [...picked].filter(k => DISCOVER[k] && k !== "story").length * durs.size + (types.has("story") ? 1 : 0) : 0;
+    const units = n*2 + 2 + disc*100 + (disc ? 50 : 0);
+    $("cost").textContent = !types.size ? "Marque pelo menos um tipo de vídeo" : !activeCats().size ? "Escolha pelo menos uma categoria" :
       `${n} ${n===1?"canal":"canais"}${disc ? " + canais novos" : ""} · cerca de ${units.toLocaleString("pt-BR")} das 10.000 unidades grátis de hoje`;
-    $("go").disabled = busy || (!n && !disc);
+    $("go").disabled = busy || !types.size || (!n && !disc);
   }
 
   // ---------- busca ----------
@@ -534,7 +564,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     busy = true; updateCost(); showStatus("");
     showResults();
     const res = $("results"); res.innerHTML = ""; const sc = scanner(`Lendo ${list.length} canais…`); res.append(sc.node);
-    const fmt = $("format").value, minV = +$("minv").value, minB = +$("minb").value;
+    const minV = +$("minv").value, minB = +$("minb").value;
+    if (!types.size){ busy = false; showForm(); showStatus("Marque pelo menos um tipo de vídeo.", true); return; }
     const fromT = new Date(from + "T00:00:00").getTime(), toT = new Date(to + "T23:59:59").getTime();
     try {
       for (const c of list){ if (!/^UC[\w-]{22}$/.test(c.ref)){ const id = await resolveHandle(c.ref).catch(e => { if (/quota/i.test(e.reason)) throw e; return null; }); if (id){ c.ref = id; saveChannels(); } } }
@@ -544,11 +575,15 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       const newCh = new Map();
       if (discover){
         const after = new Date(fromT).toISOString(), before = new Date(toT).toISOString();
-        for (const k of [...picked].filter(k => DISCOVER[k])){
+        const durs = [...new Set([...types].filter(t => t !== "story").map(t => TYPES.find(x => x.id === t).dur))];
+        const jobs = [];
+        for (const k of [...picked].filter(k => DISCOVER[k] && k !== "story")) for (const d of durs) jobs.push([k, d]);
+        if (types.has("story")) jobs.push(["story", "short"]);
+        for (const [k, dur] of jobs){
           sc.set(`Procurando canais novos: ${TOPICS.find(t => t.id === k)?.name}…`);
           try {
             const r = await yt("search", { part:"snippet", type:"video", q: DISCOVER[k], maxResults:"50", order:"viewCount", publishedAfter: after, publishedBefore: before,
-              relevanceLanguage:"en", videoDuration: fmt === "short" ? "short" : (k === "sleep" ? "long" : "medium") });
+              relevanceLanguage:"en", videoDuration: dur });
             let added = 0;
             for (const it of r.items || []){
               const cid = it.snippet?.channelId; if (!cid || catsOf.has(cid)) continue;
@@ -596,11 +631,14 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
         for (const v of ch.recent || []){
           if (!(v.at >= fromT && v.at <= toT)) continue;
           diag.recent++;
-          if (v.live || !fitsFormat(v.sec, fmt)){ diag.format++; continue; }
+          const bk = bucketOf(v.sec);
+          const okType = types.has(bk) || (bk === "short" && types.has("story") && (catsOf.get(cid) || []).includes("story"));
+          if (v.live || !okType){ diag.format++; continue; }
           if (v.views < minV){ diag.views++; continue; }
           const ageDays = (now - v.at) / DAY;
           // estima quanto cada outro vídeo do canal tinha na idade deste
-          const others = ch.recent.filter(o => o.id !== v.id && !o.live && fitsFormat(o.sec, fmt) && now - o.at > 2*DAY);
+          // compara só com vídeos do mesmo tipo no canal (Short com Shorts, longo com longos)
+          const others = ch.recent.filter(o => o.id !== v.id && !o.live && bucketOf(o.sec) === bk && now - o.at > 2*DAY);
           const atAge = others.map(o => o.views * Math.min(1, curve(ageDays) / curve((now - o.at) / DAY)));
           const med = median(atAge);
           const life = ch.total > 0 && ch.totalViews > 0 ? (ch.totalViews / ch.total) * curve(ageDays) : null;
@@ -639,7 +677,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       const lines = [];
       if (diag){
         lines.push(`Li ${diag.channels} ${diag.channels === 1 ? "canal" : "canais"}${diag.fresh ? `, ${diag.fresh} ${diag.fresh === 1 ? "novo" : "novos"}` : ""}${diag.missing ? ` (${diag.missing} não ${diag.missing>1?"foram encontrados":"foi encontrado"}, confira em Ajustes)` : ""}. ${diag.recent} ${diag.recent === 1 ? "vídeo foi publicado" : "vídeos foram publicados"} no período.`);
-        if (diag.format) lines.push(`${diag.format} ${diag.format>1?"cortados":"cortado"} pelo formato (${$("format").value === "short" ? "não eram Shorts" : "eram Shorts, vídeos de até 3 min ou lives"}).`);
+        if (diag.format) lines.push(`${diag.format} ${diag.format>1?"eram":"era"} de um tipo que você não marcou (ou live).`);
         if (diag.views) lines.push(`${diag.views} ${diag.views>1?"tinham":"tinha"} menos de ${short(diag.minV)} views.`);
         if (diag.breakout) lines.push(`${diag.breakout} ${diag.breakout>1?"ficaram":"ficou"} abaixo de ${diag.minB}× a média do canal.`);
       }
@@ -937,9 +975,9 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   applyTheme();
   try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch {}
   document.querySelectorAll("#themeSeg button").forEach(b => b.addEventListener("click", () => { store.set("theme", b.dataset.theme); applyTheme(); }));
-  const defaults = { format:"long", minb:"2", minv:"5000", discover:"on" };
+  const defaults = { minb:"2", minv:"5000", discover:"on" };
   for (const id of Object.keys(defaults)){ $(id).value = store.get("opt."+id, defaults[id]); $(id).addEventListener("change", () => { store.set("opt."+id, $(id).value); updateCost(); }); }
-  greet(); paintTiles(); setPeriod(period);
+  greet(); paintTypes(); paintTiles(); setPeriod(period);
   document.querySelectorAll("#period .chip").forEach(b => b.addEventListener("click", () => setPeriod(b.dataset.days)));
   $("apikey").value = store.get("apikey", "");
   $("go").addEventListener("click", run);
