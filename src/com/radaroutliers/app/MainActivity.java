@@ -152,7 +152,7 @@ public class MainActivity extends Activity {
             pool.execute(() -> {
                 HttpURLConnection c = null;
                 try {
-                    if (!url.startsWith("https://www.googleapis.com/")) { respond(id, 0, "blocked"); return; }
+                    if (!url.startsWith("https://www.googleapis.com/") && !url.startsWith("https://translate.googleapis.com/")) { respond(id, 0, "blocked"); return; }
                     c = (HttpURLConnection) new URL(url).openConnection();
                     c.setConnectTimeout(15000);
                     c.setReadTimeout(30000);

@@ -594,7 +594,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       const used = new Set(); for (const t of TOPICS){ const best = videos.find(v => v.topics.includes(t.id) && !used.has(v.id)) || videos.find(v => v.topics.includes(t.id)); if (best){ used.add(best.id); store.set("tthumb." + t.id, best.thumb); } }
       store.set("last", videos); idx = 0; history = [];
       $("lastBtn").hidden = true;
-      paintTiles(); renderChannels(); renderResults();
+      paintTiles(); renderChannels(); renderResults(); translateTitles(videos);
     } catch (e) { showForm(); showStatus(errText(e), true); }
     busy = false; updateCost();
   }
@@ -752,7 +752,27 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     for (const k of Object.keys(DICT).sort((a,b) => b.length - a.length)) t = t.replace(new RegExp(" " + k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "(?= )", "g"), " " + DICT[k] + "\u0001");
     return t.replace(/\u0001/g,"").replace(/\s+/g," ").trim();
   }
-  function ptTitle(v){ const t = (v.br && v.br.query) || draftPT(v.title); return t ? t.charAt(0).toUpperCase() + t.slice(1) : ""; }
+  // Tradução dos títulos: serviço de tradução do Google (sem chave), guardada no celular. O dicionário é só reserva.
+  const ptCache = new Map(Object.entries(store.get("ptTitles", {})));
+  function ptTitle(v){ const t = (v.br && v.br.query) || ptCache.get(v.id) || draftPT(v.title); return t ? t.charAt(0).toUpperCase() + t.slice(1) : ""; }
+  async function gtranslate(text){
+    const r = await httpGet("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=pt&dt=t&q=" + encodeURIComponent(text));
+    if (r.status !== 200) throw new Error("tradução " + r.status);
+    const j = JSON.parse(r.body);
+    return (j[0] || []).map(x => x[0] || "").join("");
+  }
+  async function translateTitles(list){
+    const need = list.filter(v => v && v.id && !ptCache.has(v.id));
+    for (const part of chunk(need, 20)){
+      try {
+        const out = (await gtranslate(part.map(v => decode(v.title).replace(/\n/g, " ")).join("\n"))).split("\n");
+        if (out.length === part.length) part.forEach((v, i) => { if (out[i].trim()) ptCache.set(v.id, out[i].trim()); });
+        else for (const v of part){ try { const t = (await gtranslate(decode(v.title))).trim(); if (t) ptCache.set(v.id, t); } catch {} }
+      } catch { return; }
+      store.set("ptTitles", Object.fromEntries([...ptCache].slice(-800)));
+      document.querySelectorAll("[data-pt]").forEach(n => { const id = n.getAttribute("data-pt"); const v = list.find(x => x.id === id); if (v && ptCache.has(id) && !(v.br && v.br.query)) n.textContent = ptTitle(v); });
+    }
+  }
   const STOP = new Set("o a os as um uma uns umas de do da dos das e ou que se em no na nos nas por para com sem como é são seu sua seus suas você voce isso esse essa este esta ao aos à às mais muito the of and to in what if how why your you is are".split(" "));
   const norm = (s) => decode(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ");
   const words = (s) => [...new Set(norm(s).split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w)))];
@@ -760,9 +780,9 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
 
   function paintBR(box, v){
     box.innerHTML = "";
-    if (!v.br){ box.append(el("button",{class:"brbtn",type:"button",onclick:()=>checkBR(v, draftPT(v.title), box)}, "Existe no Brasil?", el("span",{},"≈100 unidades"))); return; }
+    if (!v.br){ box.append(el("button",{class:"brbtn",type:"button",onclick:()=>checkBR(v, ptTitle(v), box)}, "Existe no Brasil?", el("span",{},"≈100 unidades"))); return; }
     if (v.br.loading){ box.append(el("div",{class:"brbtn"}, "Procurando no YouTube brasileiro…")); return; }
-    const input = el("input",{type:"text",value:v.br.query || draftPT(v.title),"aria-label":"Busca em português"});
+    const input = el("input",{type:"text",value:v.br.query || ptTitle(v),"aria-label":"Busca em português"});
     const adjust = el("details",{class:"adjust"}, el("summary",{},"Ajustar a busca em português"),
       el("div",{class:"qrow"}, input, el("button",{type:"button",onclick:()=>checkBR(v, input.value.trim(), box)},"Buscar")));
     if (v.br.error){ const b = el("div",{class:"brbox feito"}, el("span",{class:"v"}, v.br.error), adjust); adjust.open = true; box.append(b); return; }
@@ -815,6 +835,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     const list = Object.values(saved()).sort((a,b) => b.savedAt - a.savedAt).map(v => ({ ...v, br: store.get("br."+v.id, v.br || null) }));
     if (!list.length){ box.append(el("div",{class:"empty"}, el("strong",{},"Nenhuma ideia salva"), el("p",{},"Nas cartas, arraste um vídeo para a direita ou toque no marcador para guardar a ideia aqui."))); return; }
     const wrap = el("div",{class:"view"}); renderList(wrap, list, false); box.append(wrap);
+    translateTitles(list);
   }
 
   // ---------- ajustes: canais ----------
@@ -911,7 +932,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     videos = last;
     $("lastBtn").hidden = false;
     $("lastBtn").innerHTML = '<b>Última busca:</b> ' + last.length + ' vídeos. <span class="lnk">Ver de novo</span>';
-    $("lastBtn").addEventListener("click", () => { videos = store.get("last", []); idx = 0; history = []; showResults(); renderResults(); });
+    $("lastBtn").addEventListener("click", () => { videos = store.get("last", []); idx = 0; history = []; showResults(); renderResults(); translateTitles(videos); });
   }
 })();
 </script>
