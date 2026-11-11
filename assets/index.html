@@ -33,7 +33,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 :focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
-main{max-width:600px;margin:0 auto;padding:22px 16px 150px}
+main{max-width:600px;margin:0 auto;padding:22px 16px 210px}
 .view{display:flex;flex-direction:column;gap:20px}
 
 /* ---------- busca ---------- */
@@ -81,7 +81,14 @@ details.more[open] summary::after{transform:rotate(-135deg) translateY(-2px)}
 
 .cta{position:fixed;left:0;right:0;bottom:66px;z-index:8;padding:12px 16px 12px;background:linear-gradient(180deg,transparent,var(--bg) 35%)}
 .cta-in{max-width:568px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
-.go{background:var(--amber);color:var(--on-amber);border-radius:18px;padding:16px;font-weight:900;font-size:18px;width:100%}
+.ctarow{display:flex;gap:10px;align-items:stretch}
+.fbtn{position:relative;flex:none;display:flex;align-items:center;gap:7px;background:var(--card);border-radius:18px;padding:0 16px;font-weight:700;font-size:15px}
+.fdot{position:absolute;top:10px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--amber)}
+.fpanel{padding:16px 0 calc(22px + env(safe-area-inset-bottom, 0px))}
+.fhead{display:flex;justify-content:space-between;align-items:center;padding:0 16px 12px}
+.fhead h3{margin:0;font-size:20px;font-weight:900}
+.fpanel .more-in{padding:0 16px}
+.go{background:var(--amber);color:var(--on-amber);border-radius:18px;padding:16px;font-weight:900;font-size:18px;flex:1;min-width:0}
 .go:disabled{opacity:.45}
 .cost{font-size:12px;color:var(--muted);text-align:center}
 .note{font-size:14px;padding:12px 14px;border-radius:14px;background:var(--card)}
@@ -262,17 +269,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       <div class="note" id="needKey" hidden>Para começar, cadastre sua chave grátis da API do YouTube em <button class="lnk" type="button" id="toSettings">Ajustes</button>.</div>
       <button class="note" type="button" id="lastBtn" hidden style="text-align:left;width:100%"></button>
       <div class="tiles" id="tiles"></div>
-      <details class="more" id="more">
-        <summary>Mais filtros</summary>
-        <div class="more-in">
-          <div class="field"><label for="format">Formato</label><select id="format"><option value="long">Vídeo longo</option><option value="short">Shorts</option></select></div>
-          <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
-          <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
-          <div class="field full"><label for="discover">Canais novos do tema</label><select id="discover"><option value="on">Procurar também canais novos</option><option value="off">Só os canais que acompanho</option></select></div>
-        </div>
-      </details>
       <div class="note" id="status" hidden></div>
-      <div class="cta" id="cta"><div class="cta-in"><button class="go" id="go" type="button">Buscar outliers</button><div class="cost" id="cost"></div></div></div>
+      <div class="cta" id="cta"><div class="cta-in"><div class="ctarow"><button class="fbtn" id="filtersBtn" type="button" aria-label="Filtros"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Filtros<span class="fdot" id="fdot" hidden></span></button><button class="go" id="go" type="button">Buscar outliers</button></div><div class="cost" id="cost"></div></div></div>
     </div>
     <div id="results" class="view" hidden></div>
   </section>
@@ -335,6 +333,15 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   <button role="tab" data-view="ajustes" aria-selected="false"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Ajustes</button>
 </div></nav>
 
+<div class="sheet" id="fsheet" hidden><div class="scrim" id="fscrim"></div><div class="panel fpanel">
+  <div class="fhead"><h3>Filtros</h3><button class="btn" id="fdone" type="button">Pronto</button></div>
+  <div class="more-in">
+          <div class="field"><label for="format">Formato</label><select id="format"><option value="long">Vídeo longo</option><option value="short">Shorts</option></select></div>
+          <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
+          <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
+          <div class="field full"><label for="discover">Canais novos do tema</label><select id="discover"><option value="on">Procurar também canais novos</option><option value="off">Só os canais que acompanho</option></select></div>
+        </div>
+</div></div>
 <div class="sheet" id="sheet" hidden><div class="scrim" id="scrim"></div><div class="panel" id="panel"></div></div>
 
 <script>
@@ -918,6 +925,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     window.scrollTo(0, 0);
   }
   window.__back = () => {
+    if (!$("fsheet").hidden){ $("fsheet").hidden = true; paintFilterDot(); updateCost(); return true; }
     if (!$("sheet").hidden){ closeSheet(); return true; }
     const cur = document.querySelector('.nav button[aria-selected="true"]')?.dataset.view;
     if (cur && cur !== "buscar"){ switchView("buscar"); return true; }
@@ -937,6 +945,13 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   $("go").addEventListener("click", run);
   $("saveKey").addEventListener("click", saveKey);
   $("addChan").addEventListener("click", addChannel);
+  const openFilters = () => { $("fsheet").hidden = false; };
+  const closeFilters = () => { $("fsheet").hidden = true; paintFilterDot(); updateCost(); };
+  function paintFilterDot(){ $("fdot").hidden = Object.keys(defaults).every(id => $(id).value === defaults[id]); }
+  $("filtersBtn").addEventListener("click", openFilters);
+  $("fdone").addEventListener("click", closeFilters);
+  $("fscrim").addEventListener("click", closeFilters);
+  paintFilterDot();
   $("quotaChip").addEventListener("click", () => switchView("ajustes"));
   setInterval(paintQuota, 60000);
   renderChannels();
