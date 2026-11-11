@@ -215,6 +215,16 @@ details.guide summary{font-weight:700;font-size:14.5px;cursor:pointer}
 ol.steps{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px}
 code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}
 
+.chanlist{display:flex;flex-direction:column;gap:14px}
+.chancat{display:flex;flex-direction:column;gap:6px}
+.chancat h4{margin:0;font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.chanrow{display:flex;align-items:center;gap:10px;background:var(--raised);border-radius:12px;padding:8px 8px 8px 12px;font-size:14px}
+.chanrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chanrow span.bad{color:var(--bad)}
+.chanrow button{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--muted);flex:none}
+.chanrow button svg.i{width:16px;height:16px}
+.tile small{position:absolute;left:12px;top:10px;font-size:11.5px;font-weight:600;opacity:.85;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+
 /* navegação */
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--bg);border-top:1px solid var(--line)}
 .nav-in{max-width:600px;margin:0 auto;display:flex}
@@ -248,10 +258,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
         <summary>Mais filtros</summary>
         <div class="more-in">
           <div class="field"><label for="format">Formato</label><select id="format"><option value="long">Vídeo longo</option><option value="short">Shorts</option></select></div>
-          <div class="field"><label for="lang">Idioma original</label><select id="lang"><option value="en">Inglês</option><option value="es">Espanhol</option><option value="fr">Francês</option><option value="de">Alemão</option></select></div>
           <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
           <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
-          <div class="field full"><label for="custom">Outro tema em inglês (curto funciona melhor)</label><input id="custom" type="text" placeholder="1 a 3 palavras, ex.: black holes" autocomplete="off"></div>
         </div>
       </details>
       <div class="note" id="status" hidden></div>
@@ -284,6 +292,16 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       </div>
     </div>
     <div class="sec">
+      <h3>Canais acompanhados</h3>
+      <div class="box">
+        <p class="hint">O app olha os vídeos recentes destes canais e mostra os que renderam acima da média de cada um. Adicione canais gringos do seu nicho para achar mais ideias.</p>
+        <div class="row2"><input id="newChan" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="@canal ou link do canal"></div>
+        <div class="row2"><select id="newCat" style="flex:1"></select><button class="btn" id="addChan" type="button">Adicionar</button></div>
+        <p class="hint" id="chanStatus"></p>
+        <div id="chanList" class="chanlist"></div>
+      </div>
+    </div>
+    <div class="sec">
       <h3>Aparência</h3>
       <div class="seg" id="themeSeg" role="group" aria-label="Tema">
         <button type="button" data-theme="auto">Automático</button>
@@ -296,7 +314,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
       <div class="box">
         <div class="meter-l"><span>Usado</span><b id="quota">0 de 10.000</b></div>
         <div class="meter"><i id="meter"></i></div>
-        <p class="hint">Cada tema buscado gasta cerca de 100, e cada checagem no Brasil também. Zera às 4h ou 5h da manhã (horário de Brasília).</p>
+        <p class="hint">Uma busca gasta cerca de 2 unidades por canal acompanhado. Cada checagem no Brasil gasta cerca de 100. Zera às 4h ou 5h da manhã (horário de Brasília).</p>
       </div>
     </div>
   </section>
@@ -316,19 +334,37 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   const $ = (id) => document.getElementById(id);
   const DAY = 86400000;
 
+  // Categorias da tela de busca. Cada uma agrupa canais acompanhados.
   const TOPICS = [
-    { id:"whatif", name:"E se…?", q:"what if", c:["#6D28D9","#DB2777"], icon:'<path d="M9 9a3 3 0 1 1 4.5 2.6c-.9.5-1.5 1.2-1.5 2.4"/><circle cx="12" cy="18" r=".6"/>' },
-    { id:"space", name:"Espaço", q:"space explained", c:["#0F172A","#2563EB"], icon:'<circle cx="12" cy="12" r="4"/><path d="M3 15c3-1 15-7 18-9"/>' },
-    { id:"body", name:"Corpo humano", q:"human body", c:["#9F1239","#F97316"], icon:'<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>' },
-    { id:"brain", name:"Cérebro e mente", q:"brain explained", c:["#831843","#A855F7"], icon:'<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>' },
-    { id:"animals", name:"Animais", q:"animal facts", c:["#14532D","#65A30D"], icon:'<circle cx="7" cy="9" r="1.8"/><circle cx="12" cy="6.5" r="1.8"/><circle cx="17" cy="9" r="1.8"/><path d="M8.5 16.5c0-2.2 1.6-4 3.5-4s3.5 1.8 3.5 4-1.6 2.5-3.5 2.5-3.5-.3-3.5-2.5z"/>' },
-    { id:"prehistory", name:"Pré-história", q:"dinosaurs", c:["#422006","#B45309"], icon:'<path d="M4 18c2-1 3-4 3-7s2-6 6-6 5 2 5 4-2 2-2 2l3 7M10 18v-3M14 18v-4"/>' },
-    { id:"physics", name:"Física", q:"physics explained", c:["#0C4A6E","#06B6D4"], icon:'<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)"/>' },
-    { id:"earth", name:"Planeta Terra", q:"earth explained", c:["#064E3B","#0EA5E9"], icon:'<circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z"/>' },
-    { id:"tech", name:"Como funciona", q:"how it works", c:["#1F2937","#64748B"], icon:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>' },
-    { id:"scale", name:"Escala e tamanho", q:"size comparison", c:["#312E81","#F59E0B"], icon:'<rect x="3" y="13" width="5" height="7" rx="1"/><rect x="10" y="9" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>' },
-    { id:"chem", name:"Química", q:"chemistry explained", c:["#3F6212","#14B8A6"], icon:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>' },
-    { id:"sleep", name:"Ciência p/ dormir", q:"science for sleep", c:["#020617","#4338CA"], icon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>' }
+    { id:"whatif", name:"E se…?", c:["#6D28D9","#DB2777"], icon:'<path d="M9 9a3 3 0 1 1 4.5 2.6c-.9.5-1.5 1.2-1.5 2.4"/><circle cx="12" cy="18" r=".6"/>' },
+    { id:"space", name:"Espaço", c:["#0F172A","#2563EB"], icon:'<circle cx="12" cy="12" r="4"/><path d="M3 15c3-1 15-7 18-9"/>' },
+    { id:"body", name:"Corpo humano", c:["#9F1239","#F97316"], icon:'<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>' },
+    { id:"mind", name:"Mente e comportamento", c:["#831843","#A855F7"], icon:'<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>' },
+    { id:"earth", name:"Terra e pré-história", c:["#064E3B","#B45309"], icon:'<circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z"/>' },
+    { id:"physics", name:"Física e escala", c:["#0C4A6E","#06B6D4"], icon:'<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)"/>' },
+    { id:"sleep", name:"Ciência p/ dormir", c:["#020617","#4338CA"], icon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>' },
+    { id:"general", name:"Curiosidades", c:["#312E81","#F59E0B"], icon:'<rect x="3" y="13" width="5" height="7" rx="1"/><rect x="10" y="9" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>' }
+  ];
+  // Canais iniciais: os que apareceram como outliers no vidIQ + alguns grandes do nicho.
+  const DEFAULT_CHANNELS = [
+    ["UCrGDUlj_hjaNz97jdXCOReA","All Answers",["whatif"]], ["UCgYSQsRS3Mz6q0FDDuuILiw","Blotwise",["whatif"]], ["UCkhJeR5N7UpVwklhiBAISMQ","Brain Cipher",["whatif"]],
+    ["UCv4DniMRgnBTmfFaxeMTTLA","IFOLOGY",["whatif"]], ["UCgctuDz_Dy7D0K8K6NsoGyw","Sappy Man",["whatif"]], ["UCWnLnTa5YDjLNejjQhZ_jEg","What If Data",["whatif"]],
+    ["UCS1wU6D2QcveLA9XFOfevfA","Timebound",["whatif"]], ["UC4_ZBxBKeI7EvERl1xOY1jQ","What if U click",["whatif"]], ["UCAKHpKPS8gcxnRu_sR7Rl7g","What If Hero",["whatif"]],
+    ["UCGDYkZRg0XKIc3Oa2v-XgNA","Price of If",["whatif"]], ["UCdvbGznFEcB7E3IS7Wo-F7A","IfYou Films",["whatif"]], ["UCz_3Uq3f8baj8izgFOCOS7A","The Spiral Card",["whatif"]],
+    ["UCIHVYxXnwAzTvNU0PE_ZLsg","Jeremy Bearimy",["whatif"]], ["UCK2QY_U30DW-EuGY8Hc8QpA","Hypo Motion",["whatif"]],
+    ["UC1pACXxUjIWNDuU-kY1OX0Q","Kosmo",["space"]], ["UC9pYOJPB5UYlMlGKKZWo-Bw","Astro Horizons",["space"]], ["UCInaHwlxUu3CJnUJOO3DJXA","ballSpace",["space"]],
+    ["UC-N09sTOCLozxjvKskUUjhw","The Cosmic Silence",["space"]], ["UCoqxbwMGAdDQPWINzYL0jgA","Space After Midnight",["space"]], ["UC2U_ApECr-ifnTu9GIHcAEg","Space Meltdown",["space","physics"]],
+    ["UCsXVk37bltHxD1rDPwtNM8Q","Kurzgesagt",["space","general"]],
+    ["UCzVbZO0Vxy7a6RHpG691A_A","Anatomica",["body"]], ["UC_2XL2lThI85UYxtLSwk18w","The Brain Maze",["body"]], ["UCOqOSMaWVq5uRdSSDbph7gQ","Life_Facts",["body"]],
+    ["UCbvt0nrs8EX-zYD4doHuhxA","Mortality Lab",["body"]],
+    ["UC-XT0D528Et-Poni4ENJ4Uw","JoeDot",["mind"]], ["UCQmu5-9-ovBiFrgMTojikFw","Cosmo Explains Psychology",["mind"]],
+    ["UCmv2Mg0r8CfCuVM-G76-yiw","Professor Doodle",["earth"]], ["UCskKty8VpO8S7eLX0xU_u3A","Depth Theory",["earth"]], ["UCRDZ_t_-uHLsz_Otq6iOgyg","Michael Button",["earth"]],
+    ["UCeiYXex_fwgYDonaTcSIk6w","MinuteEarth",["earth"]],
+    ["UCXgxODuunoOyGh6sg2rkVsw","Visible Reason",["physics"]], ["UCdrIhdvoEZAPxBa6WMYb3WA","Nom - Lumi",["physics"]], ["UCUHW94eEFW7hkUMVaZz4eDg","MinutePhysics",["physics"]],
+    ["UCT_gj1PLZNis4dSh2RZFZVg","Dozeology",["sleep"]], ["UCE4CwHCOVG7mCdbmp8hjXgw","Science Before Sleep",["sleep"]], ["UCRsDdBx9JqgNVVqH0GBVzeA","Science Into Sleep",["sleep"]],
+    ["UC1V1vTmZIX_dVWonhi7GCAg","Sleepy Science Mysteries",["sleep"]],
+    ["UCsooa4yRKGN_zEE8iknghZA","TED-Ed",["general"]], ["UCfdNM3NAhaBOXCafH7krzrA","The Infographics Show",["general"]], ["UC176GAQozKKjhz62H8u9vQQ","Real Science",["general"]],
+    ["UCwyVRKfytvjSF6q5s7noKZQ","Mr. DeMaio",["general"]]
   ];
   const IC = {
     check:'<path d="M5 12.5l4.5 4.5L19 7"/>', x:'<path d="M6 6l12 12M18 6L6 18"/>', save:'<path d="M6 3h12v18l-6-4-6 4z"/>',
@@ -403,14 +439,22 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     return n;
   }
 
-  // ---------- busca: temas, período, saudação ----------
-  let picked = new Set(store.get("topics", ["whatif","space","body"]));
+  // ---------- canais ----------
+  let channels = store.get("channels.v1", null);
+  if (!Array.isArray(channels)) channels = DEFAULT_CHANNELS.map(([ref, name, cats]) => ({ ref, name, cats }));
+  const saveChannels = () => store.set("channels.v1", channels);
+  const chanName = (c) => store.get("chname." + c.ref, "") || c.name || c.ref;
+
+  // ---------- busca: categorias, período, saudação ----------
+  let picked = new Set(store.get("cats", ["whatif","space","body"]));
   function paintTiles(){
     const box = $("tiles"); box.innerHTML = "";
     for (const t of TOPICS){
+      const n = channels.filter(c => c.cats.includes(t.id)).length;
       const thumb = store.get("tthumb." + t.id, "");
-      box.append(el("button",{class:"tile",type:"button","aria-pressed":String(picked.has(t.id)),onclick:()=>{ picked.has(t.id) ? picked.delete(t.id) : picked.add(t.id); store.set("topics",[...picked]); paintTiles(); updateCost(); }},
+      box.append(el("button",{class:"tile",type:"button","aria-pressed":String(picked.has(t.id)),onclick:()=>{ picked.has(t.id) ? picked.delete(t.id) : picked.add(t.id); store.set("cats",[...picked]); paintTiles(); updateCost(); }},
         thumb ? el("img",{src:thumb,alt:"",loading:"lazy"}) : el("span",{class:"bg",style:`background:linear-gradient(135deg,${t.c[0]},${t.c[1]})`}),
+        el("small",{}, n + (n === 1 ? " canal" : " canais")),
         el("span",{class:"ico"}, icon(t.icon)), el("span",{class:"chk"}, icon("check")), el("b",{}, t.name)));
     }
   }
@@ -425,10 +469,10 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     $("headline").innerHTML = 'O que estourou <em>lá fora</em> ' + PERIOD_TXT[p] + '?';
   }
   function greet(){ const h = new Date().getHours(); $("hello").textContent = h < 5 ? "Boa noite" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; }
-  const queries = () => { const q = TOPICS.filter(t => picked.has(t.id)).map(t => ({ q: t.q, topic: t.id })); const c = $("custom").value.trim(); if (c) q.push({ q: c, topic: null }); return q; };
+  const selectedChannels = () => channels.filter(c => c.cats.some(k => picked.has(k)));
   function updateCost(){
-    const n = queries().length;
-    $("cost").textContent = n ? `${n} ${n>1?"temas":"tema"} · cerca de ${(n*100 + 60).toLocaleString("pt-BR")} das 10.000 unidades grátis de hoje` : "Escolha pelo menos um tema";
+    const n = selectedChannels().length;
+    $("cost").textContent = n ? `${n} ${n>1?"canais":"canal"} · cerca de ${(n*2 + 2).toLocaleString("pt-BR")} das 10.000 unidades grátis de hoje` : (picked.size ? "Essas categorias não têm canais. Adicione em Ajustes." : "Escolha pelo menos uma categoria");
     $("go").disabled = busy || !n;
   }
 
@@ -442,45 +486,43 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   function showForm(){ $("form").hidden = false; $("results").hidden = true; $("cta").hidden = false; window.scrollTo(0,0); }
   function showResults(){ $("form").hidden = true; $("results").hidden = false; $("cta").hidden = true; window.scrollTo(0,0); }
 
+  async function resolveHandle(ref){
+    const h = ref.replace(/^@/, "");
+    const r = await yt("channels", { part:"id,snippet", forHandle: h });
+    const c = (r.items || [])[0];
+    if (c){ store.set("chname." + c.id, c.snippet?.title || h); return c.id; }
+    return null;
+  }
+
   async function run(){
     if (busy) return;
     if (!store.get("apikey","")){ switchView("ajustes"); return; }
     const from = $("from").value, to = $("to").value;
     if (!from || !to || from > to){ showStatus("Confira as datas: o início precisa ser antes do fim.", true); return; }
+    const list = selectedChannels();
+    if (!list.length) return;
     busy = true; updateCost(); showStatus("");
     showResults();
-    const res = $("results"); res.innerHTML = ""; const sc = scanner("Procurando vídeos…"); res.append(sc.node);
+    const res = $("results"); res.innerHTML = ""; const sc = scanner(`Lendo ${list.length} canais…`); res.append(sc.node);
     const fmt = $("format").value, minV = +$("minv").value, minB = +$("minb").value;
-    const after = new Date(from + "T00:00:00").toISOString(), before = new Date(to + "T23:59:59").toISOString();
+    const fromT = new Date(from + "T00:00:00").getTime(), toT = new Date(to + "T23:59:59").getTime();
     try {
-      const ids = new Map();
-      for (const { q, topic } of queries()){
-        // Pede ao YouTube só o formato certo: sem isso a busca da semana volta quase toda em Shorts.
-        const params = { part:"snippet", type:"video", q, maxResults:"50", order:"viewCount", publishedAfter:after, publishedBefore:before, relevanceLanguage:$("lang").value,
-          videoDuration: fmt === "short" ? "short" : (topic === "sleep" ? "long" : "medium") };
-        const r = await yt("search", params);
-        for (const it of r.items || []){ const id = it.id?.videoId; if (!id) continue; if (!ids.has(id)) ids.set(id, new Set()); if (topic) ids.get(id).add(topic); }
-      }
-      sc.set(`Conferindo ${ids.size} vídeos…`);
-      const cands = []; diag = { found: ids.size, format: 0, views: 0, breakout: 0 };
-      for (const part of chunk([...ids.keys()], 50)){
-        const r = await yt("videos", { part:"snippet,statistics,contentDetails", id: part.join(",") });
-        for (const v of r.items || []){
-          const s = secs(v.contentDetails?.duration), views = +(v.statistics?.viewCount || 0);
-          if (v.snippet?.liveBroadcastContent && v.snippet.liveBroadcastContent !== "none"){ diag.format++; continue; }
-          if (!fitsFormat(s, fmt)){ diag.format++; continue; }
-          if (views < minV){ diag.views++; continue; }
-          cands.push({ id: v.id, title: v.snippet.title, channelId: v.snippet.channelId, channel: v.snippet.channelTitle, published: v.snippet.publishedAt, sec: s, views,
-            thumb: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url || "", topics: [...ids.get(v.id)] });
+      for (const c of list){ if (!/^UC[\w-]{22}$/.test(c.ref)){ const id = await resolveHandle(c.ref).catch(e => { if (/quota/i.test(e.reason)) throw e; return null; }); if (id){ c.ref = id; saveChannels(); } } }
+      const catsOf = new Map();
+      for (const c of list) if (/^UC/.test(c.ref)) catsOf.set(c.ref, [...new Set([...(catsOf.get(c.ref) || []), ...c.cats])]);
+      const ids = [...catsOf.keys()], chans = new Map();
+      for (const part of chunk(ids, 50)){
+        const r = await yt("channels", { part:"snippet,statistics,contentDetails", id: part.join(",") });
+        for (const c of r.items || []){
+          chans.set(c.id, { title: c.snippet?.title || "", subs: c.statistics?.hiddenSubscriberCount ? null : +(c.statistics?.subscriberCount || 0), uploads: c.contentDetails?.relatedPlaylists?.uploads, total: +(c.statistics?.videoCount || 0), totalViews: +(c.statistics?.viewCount || 0) });
+          if (c.snippet?.title) store.set("chname." + c.id, c.snippet.title);
         }
       }
-      const chIds = [...new Set(cands.map(c => c.channelId))], chans = new Map();
-      for (const part of chunk(chIds, 50)){
-        const r = await yt("channels", { part:"statistics,contentDetails", id: part.join(",") });
-        for (const c of r.items || []) chans.set(c.id, { subs: c.statistics?.hiddenSubscriberCount ? null : +(c.statistics?.subscriberCount || 0), uploads: c.contentDetails?.relatedPlaylists?.uploads, total: +(c.statistics?.videoCount || 0), totalViews: +(c.statistics?.viewCount || 0) });
-      }
+      for (const c of list){ if (chans.has(c.ref)) delete c.bad; else c.bad = true; }
+      saveChannels();
+      diag = { channels: chans.size, missing: list.filter(c => c.bad).length, recent: 0, format: 0, views: 0, breakout: 0, minB, minV };
       let done = 0;
-      await pool(chIds, 5, async (cid) => {
+      await pool([...chans.keys()], 5, async (cid) => {
         const ch = chans.get(cid);
         if (ch?.uploads){
           try {
@@ -488,36 +530,43 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
             const vids = (pl.items || []).map(i => i.contentDetails?.videoId).filter(Boolean);
             if (vids.length){
               const r = await yt("videos", { part:"statistics,contentDetails,snippet", id: vids.join(",") });
-              ch.recent = (r.items || []).map(v => ({ id: v.id, views: +(v.statistics?.viewCount || 0), sec: secs(v.contentDetails?.duration), at: Date.parse(v.snippet?.publishedAt) }));
+              ch.recent = (r.items || []).map(v => ({ id: v.id, title: v.snippet?.title || "", views: +(v.statistics?.viewCount || 0), sec: secs(v.contentDetails?.duration),
+                at: Date.parse(v.snippet?.publishedAt), live: !!(v.snippet?.liveBroadcastContent && v.snippet.liveBroadcastContent !== "none"),
+                thumb: v.snippet?.thumbnails?.high?.url || v.snippet?.thumbnails?.medium?.url || "" }));
             }
           } catch (e) { if (/quota/i.test(e.reason)) throw e; }
         }
-        sc.set(`Comparando com a média de cada canal… ${++done} de ${chIds.length}`);
+        sc.set(`Comparando cada vídeo com a média do canal… ${++done} de ${chans.size}`);
       });
       const now = Date.now();
-      for (const c of cands){
-        const ch = chans.get(c.channelId) || {};
-        c.subs = ch.subs ?? null;
-        // Curva típica: um vídeo junta ~26% das views do 1º mês em 3 dias, ~50% em 7, ~95% em 30.
-        const curve = (days) => 1 - Math.exp(-Math.max(days, 0.25) / 10);
-        const ageDays = (now - Date.parse(c.published)) / DAY;
-        const others = (ch.recent || []).filter(v => v.id !== c.id && fitsFormat(v.sec, fmt) && now - v.at > 2*DAY);
-        // estima quanto cada vídeo do canal tinha na idade do candidato
-        const atAge = others.map(v => v.views * Math.min(1, curve(ageDays) / curve((now - v.at) / DAY)));
-        const med = median(atAge);
-        const life = ch.total > 0 && ch.totalViews > 0 ? (ch.totalViews / ch.total) * curve(ageDays) : null;
-        c.baseline = atAge.length >= 4 && med > 0 ? med : life;
-        c.breakout = c.baseline ? c.views / c.baseline : null;
-        c.vph = c.views / Math.max(1, (now - Date.parse(c.published)) / 3600000);
-        c.br = store.get("br." + c.id, null);
+      // Curva típica: um vídeo junta ~26% das views do 1º mês em 3 dias, ~50% em 7, ~95% em 30.
+      const curve = (days) => 1 - Math.exp(-Math.max(days, 0.25) / 10);
+      const cands = [];
+      for (const [cid, ch] of chans){
+        for (const v of ch.recent || []){
+          if (!(v.at >= fromT && v.at <= toT)) continue;
+          diag.recent++;
+          if (v.live || !fitsFormat(v.sec, fmt)){ diag.format++; continue; }
+          if (v.views < minV){ diag.views++; continue; }
+          const ageDays = (now - v.at) / DAY;
+          // estima quanto cada outro vídeo do canal tinha na idade deste
+          const others = ch.recent.filter(o => o.id !== v.id && !o.live && fitsFormat(o.sec, fmt) && now - o.at > 2*DAY);
+          const atAge = others.map(o => o.views * Math.min(1, curve(ageDays) / curve((now - o.at) / DAY)));
+          const med = median(atAge);
+          const life = ch.total > 0 && ch.totalViews > 0 ? (ch.totalViews / ch.total) * curve(ageDays) : null;
+          const baseline = atAge.length >= 4 && med > 0 ? med : life;
+          cands.push({ id: v.id, title: v.title, channelId: cid, channel: ch.title, subs: ch.subs, published: new Date(v.at).toISOString(), sec: v.sec, views: v.views,
+            thumb: v.thumb, topics: catsOf.get(cid) || [], baseline, breakout: baseline ? v.views / baseline : null,
+            vph: v.views / Math.max(1, (now - v.at) / 3600000), br: store.get("br." + v.id, null) });
+        }
       }
       allCands = [...cands].sort((a,b) => (b.breakout ?? -1) - (a.breakout ?? -1));
       videos = allCands.filter(c => c.breakout == null ? minB === 0 : c.breakout >= minB);
-      diag.breakout = allCands.length - videos.length; diag.minB = minB; diag.minV = minV;
+      diag.breakout = allCands.length - videos.length;
       const used = new Set(); for (const t of TOPICS){ const best = videos.find(v => v.topics.includes(t.id) && !used.has(v.id)) || videos.find(v => v.topics.includes(t.id)); if (best){ used.add(best.id); store.set("tthumb." + t.id, best.thumb); } }
       store.set("last", videos); idx = 0; history = [];
       $("lastBtn").hidden = true;
-      paintTiles(); renderResults();
+      paintTiles(); renderChannels(); renderResults();
     } catch (e) { showForm(); showStatus(errText(e), true); }
     busy = false; updateCost();
   }
@@ -539,12 +588,12 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     if (!videos.length){
       const lines = [];
       if (diag){
-        lines.push(`O YouTube devolveu ${diag.found} vídeos.`);
+        lines.push(`Li ${diag.channels} ${diag.channels === 1 ? "canal" : "canais"}${diag.missing ? ` (${diag.missing} não ${diag.missing>1?"foram encontrados":"foi encontrado"}, confira em Ajustes)` : ""}. ${diag.recent} ${diag.recent === 1 ? "vídeo foi publicado" : "vídeos foram publicados"} no período.`);
         if (diag.format) lines.push(`${diag.format} ${diag.format>1?"cortados":"cortado"} pelo formato (${$("format").value === "short" ? "não eram Shorts" : "eram Shorts, vídeos de até 3 min ou lives"}).`);
         if (diag.views) lines.push(`${diag.views} ${diag.views>1?"tinham":"tinha"} menos de ${short(diag.minV)} views.`);
         if (diag.breakout) lines.push(`${diag.breakout} ${diag.breakout>1?"ficaram":"ficou"} abaixo de ${diag.minB}× a média do canal.`);
       }
-      res.append(el("div",{class:"empty"}, el("strong",{}, diag && diag.found ? "Nada passou nos filtros" : "Nenhum vídeo encontrado"),
+      res.append(el("div",{class:"empty"}, el("strong",{}, diag && diag.recent ? "Nada passou nos filtros" : "Nenhum vídeo novo nesses canais"),
         lines.length ? el("p",{}, lines.join(" ")) : el("p",{},"Tente outros temas ou um período maior."),
         allCands.length ? el("button",{class:"btn2 amber",type:"button",onclick:()=>{ videos = allCands; store.set("last", videos); idx = 0; history = []; renderResults(); }}, `Mostrar mesmo assim (${allCands.length})`) : null,
         el("button",{class:"btn2",type:"button",onclick:showForm},"Nova busca")));
@@ -730,6 +779,44 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
     const wrap = el("div",{class:"view"}); renderList(wrap, list, false); box.append(wrap);
   }
 
+  // ---------- ajustes: canais ----------
+  function parseChannelInput(txt){
+    const t = txt.trim(); if (!t) return null;
+    const idm = t.match(/(UC[\w-]{22})/); if (idm) return idm[1];
+    const hm = t.match(/@([\w.\-]+)/); if (hm) return "@" + hm[1];
+    if (/^[\w.\-]+$/.test(t)) return "@" + t;
+    return null;
+  }
+  function renderChannels(){
+    const box = $("chanList"); box.innerHTML = "";
+    const sel = $("newCat"); if (!sel.options.length) TOPICS.forEach(t => sel.append(el("option",{value:t.id}, t.name)));
+    for (const t of TOPICS){
+      const list = channels.filter(c => c.cats.includes(t.id));
+      if (!list.length) continue;
+      box.append(el("div",{class:"chancat"}, el("h4",{}, `${t.name} (${list.length})`),
+        list.map(c => el("div",{class:"chanrow"}, el("span",{class: c.bad ? "bad" : null}, chanName(c) + (c.bad ? " (não encontrado)" : "")),
+          el("button",{type:"button","aria-label":"Remover " + chanName(c),onclick:()=>{
+            c.cats = c.cats.filter(k => k !== t.id); if (!c.cats.length) channels = channels.filter(x => x !== c);
+            saveChannels(); renderChannels(); paintTiles(); updateCost(); }}, icon("x"))))));
+    }
+  }
+  async function addChannel(){
+    const ref = parseChannelInput($("newChan").value), cat = $("newCat").value;
+    if (!ref){ $("chanStatus").textContent = "Cole o @ do canal (ex.: @kurzgesagt) ou o link do canal."; return; }
+    if (!store.get("apikey","")){ $("chanStatus").textContent = "Cadastre a chave da API primeiro."; return; }
+    $("chanStatus").textContent = "Procurando o canal…";
+    try {
+      let id = ref, name = "";
+      if (ref.startsWith("@")){ id = await resolveHandle(ref); }
+      if (!id){ $("chanStatus").textContent = "Não achei esse canal. Confira o @ ou cole o link do canal."; return; }
+      if (!name){ const r = await yt("channels", { part:"snippet", id }); const c = (r.items || [])[0]; if (!c){ $("chanStatus").textContent = "Não achei esse canal. Confira o link."; return; } name = c.snippet?.title || id; store.set("chname." + id, name); }
+      const ex = channels.find(c => c.ref === id);
+      if (ex){ if (!ex.cats.includes(cat)) ex.cats.push(cat); } else channels.push({ ref: id, name, cats: [cat] });
+      saveChannels(); renderChannels(); paintTiles(); updateCost();
+      $("newChan").value = ""; $("chanStatus").innerHTML = '<span class="ok">' + name.replace(/[<>&]/g, "") + ' adicionado.</span>';
+    } catch (e) { $("chanStatus").textContent = errText(e); }
+  }
+
   // ---------- ajustes ----------
   async function saveKey(){
     const k = $("apikey").value.trim();
@@ -768,14 +855,15 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   applyTheme();
   try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch {}
   document.querySelectorAll("#themeSeg button").forEach(b => b.addEventListener("click", () => { store.set("theme", b.dataset.theme); applyTheme(); }));
-  const defaults = { format:"long", lang:"en", minb:"2", minv:"5000" };
+  const defaults = { format:"long", minb:"2", minv:"5000" };
   for (const id of Object.keys(defaults)){ $(id).value = store.get("opt."+id, defaults[id]); $(id).addEventListener("change", () => store.set("opt."+id, $(id).value)); }
-  $("custom").value = store.get("custom", ""); $("custom").addEventListener("input", () => { store.set("custom", $("custom").value); updateCost(); });
   greet(); paintTiles(); setPeriod(period);
   document.querySelectorAll("#period .chip").forEach(b => b.addEventListener("click", () => setPeriod(b.dataset.days)));
   $("apikey").value = store.get("apikey", "");
   $("go").addEventListener("click", run);
   $("saveKey").addEventListener("click", saveKey);
+  $("addChan").addEventListener("click", addChannel);
+  renderChannels();
   $("toSettings").addEventListener("click", () => switchView("ajustes"));
   $("scrim").addEventListener("click", closeSheet);
   document.querySelectorAll(".nav button").forEach(t => t.addEventListener("click", () => switchView(t.dataset.view)));
