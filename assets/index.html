@@ -352,6 +352,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   <div class="more-in">
           <div class="field"><label for="minb">Breakout mínimo</label><select id="minb"><option value="0">Qualquer</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
           <div class="field"><label for="minv">Views mínimas</label><select id="minv"><option value="1000">1 mil</option><option value="5000">5 mil</option><option value="20000">20 mil</option><option value="100000">100 mil</option></select></div>
+          <div class="field full"><label for="storyTerms">Termos de historinha (em inglês, um por linha)</label><textarea id="storyTerms" rows="3" spellcheck="false" style="background:var(--raised);border:1.5px solid transparent;border-radius:12px;padding:10px 12px;width:100%;font:inherit;font-size:14px;color:inherit;resize:vertical"></textarea></div>
           <div class="field full"><label for="discover">Canais novos do tema</label><select id="discover"><option value="on">Procurar também canais novos</option><option value="off">Só os canais que acompanho</option></select></div>
         </div>
 </div></div>
@@ -377,7 +378,10 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   ];
   // Termos usados só para DESCOBRIR canais novos do tema (os vídeos são avaliados pela média do próprio canal).
   const DISCOVER = { whatif:"what if", space:"space universe explained", body:"human body explained", mind:"psychology explained",
-    earth:"prehistoric earth history", physics:"physics explained", sleep:"science for sleep", general:"explained animation", story:"animated story" };
+    earth:"prehistoric earth history", physics:"physics explained", sleep:"science for sleep", general:"explained animation", story:"true story animated" };
+  // Termos padrão para Shorts de historinha (histórias reais narradas com animação 3D simples). Editáveis em Filtros.
+  const STORY_TERMS = "true story animated\nthis man survived\nincredible true story 3d animation";
+  const storyTerms = () => ($("storyTerms").value || STORY_TERMS).split("\n").map(t => t.trim()).filter(Boolean).slice(0, 5);
   // Tipos de vídeo (lista de marcar na tela de busca)
   const TYPES = [
     { id:"long", name:"Vídeo longo", hint:"de 4 a 20 min", dur:"medium" },
@@ -491,6 +495,10 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   // ---------- canais ----------
   let channels = store.get("channels.v1", null);
   if (!Array.isArray(channels)) channels = DEFAULT_CHANNELS.map(([ref, name, cats]) => ({ ref, name, cats }));
+  if (!store.get("seed.story1", false)){
+    if (!channels.some(c => /zackdfilms/i.test(c.ref) || /zack d/i.test(c.name || ""))) channels.push({ ref: "@zackdfilms", name: "Zack D. Films", cats: ["story"] });
+    store.set("seed.story1", true); store.set("channels.v1", channels);
+  }
   const saveChannels = () => store.set("channels.v1", channels);
   const chanName = (c) => store.get("chname." + c.ref, "") || c.name || c.ref;
 
@@ -536,7 +544,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   function updateCost(){
     const durs = new Set([...types].filter(t => t !== "story").map(t => TYPES.find(x => x.id === t).dur));
     const n = selectedChannels().length, on = $("discover").value === "on";
-    const disc = on ? [...picked].filter(k => DISCOVER[k] && k !== "story").length * durs.size + (types.has("story") ? 1 : 0) : 0;
+    const disc = on ? [...picked].filter(k => DISCOVER[k] && k !== "story").length * durs.size + (types.has("story") ? storyTerms().length : 0) : 0;
     const units = n*2 + 2 + disc*100 + (disc ? 50 : 0);
     $("cost").textContent = !types.size ? "Marque pelo menos um tipo de vídeo" : !activeCats().size ? "Escolha pelo menos uma categoria" :
       `${n} ${n===1?"canal":"canais"}${disc ? " + canais novos" : ""} · cerca de ${units.toLocaleString("pt-BR")} das 10.000 unidades grátis de hoje`;
@@ -586,11 +594,11 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
         const durs = [...new Set([...types].filter(t => t !== "story").map(t => TYPES.find(x => x.id === t).dur))];
         const jobs = [];
         for (const k of [...picked].filter(k => DISCOVER[k] && k !== "story")) for (const d of durs) jobs.push([k, d]);
-        if (types.has("story")) jobs.push(["story", "short"]);
-        for (const [k, dur] of jobs){
+        if (types.has("story")) for (const q of storyTerms()) jobs.push(["story", "short", q]);
+        for (const [k, dur, term] of jobs){
           sc.set(`Procurando canais novos: ${TOPICS.find(t => t.id === k)?.name}…`);
           try {
-            const r = await yt("search", { part:"snippet", type:"video", q: DISCOVER[k], maxResults:"50", order:"viewCount", publishedAfter: after, publishedBefore: before,
+            const r = await yt("search", { part:"snippet", type:"video", q: term || DISCOVER[k], maxResults:"50", order:"viewCount", publishedAfter: after, publishedBefore: before,
               relevanceLanguage:"en", videoDuration: dur });
             let added = 0;
             for (const it of r.items || []){
@@ -984,6 +992,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch {}
   document.querySelectorAll("#themeSeg button").forEach(b => b.addEventListener("click", () => { store.set("theme", b.dataset.theme); applyTheme(); }));
   const defaults = { minb:"2", minv:"5000", discover:"on" };
+  $("storyTerms").value = store.get("storyTerms", STORY_TERMS);
+  $("storyTerms").addEventListener("input", () => { store.set("storyTerms", $("storyTerms").value); updateCost(); });
   for (const id of Object.keys(defaults)){ $(id).value = store.get("opt."+id, defaults[id]); $(id).addEventListener("change", () => { store.set("opt."+id, $(id).value); updateCost(); }); }
   greet(); paintTypes(); paintTiles(); setPeriod(period);
   document.querySelectorAll("#period .chip").forEach(b => b.addEventListener("click", () => setPeriod(b.dataset.days)));
