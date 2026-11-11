@@ -23,7 +23,7 @@ sed -i "s/__SHA1__/$SHA1/" "$OUT/assets/index.html"
 
 "$BT/aapt2" compile --dir res -o "$OUT/res.zip"
 "$BT/aapt2" link -I "$JAR" --manifest AndroidManifest.xml -A "$OUT/assets" \
-  --min-sdk-version 26 --target-sdk-version 35 --version-code 13 --version-name 2.2 \
+  --min-sdk-version 26 --target-sdk-version 35 --version-code 14 --version-name 2.3 \
   --java "$OUT/gen" -o "$OUT/base.apk" "$OUT/res.zip"
 
 javac -nowarn -source 11 -target 11 -encoding UTF-8 -classpath "$JAR" -d "$OUT/classes" \

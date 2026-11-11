@@ -82,13 +82,16 @@ details.more[open] summary::after{transform:rotate(-135deg) translateY(-2px)}
 .cta{position:fixed;left:0;right:0;bottom:66px;z-index:8;padding:12px 16px 12px;background:linear-gradient(180deg,transparent,var(--bg) 35%)}
 .cta-in{max-width:568px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
 .checks{display:flex;flex-direction:column;background:var(--card);border-radius:18px;overflow:hidden}
-.checks h3{margin:0;padding:12px 16px 4px;font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.checks-h{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;text-align:left;width:100%}
+.checks-h small{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.checks-h b{display:block;font-size:15px;font-weight:700;margin-top:1px}
+.checks-h .chev{width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-3px);transition:transform .15s;flex:none}
+.checks-h[aria-expanded="true"] .chev{transform:rotate(-135deg) translateY(-2px)}
 .check{display:flex;align-items:center;gap:12px;padding:11px 16px;text-align:left;width:100%;border-top:1px solid var(--line)}
-.check:first-of-type{border-top:0}
-.check .box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;flex:none;color:var(--on-amber)}
-.check .box svg.i{width:16px;height:16px;stroke-width:3.4;opacity:0}
-.check[aria-checked="true"] .box{background:var(--amber);border-color:var(--amber)}
-.check[aria-checked="true"] .box svg.i{opacity:1}
+.check .cbx{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;flex:none;color:var(--on-amber)}
+.check .cbx svg.i{width:16px;height:16px;stroke-width:3.4;opacity:0}
+.check[aria-checked="true"] .cbx{background:var(--amber);border-color:var(--amber)}
+.check[aria-checked="true"] .cbx svg.i{opacity:1}
 .check b{display:block;font-weight:700;font-size:15px}
 .check small{display:block;font-size:12.5px;color:var(--muted)}
 .ctarow{display:flex;gap:10px;align-items:stretch}
@@ -518,12 +521,17 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--raised);padding:1
   let types = new Set(store.get("types", ["long"]));
   const activeCats = () => { const a = new Set(picked); if (types.has("story")) a.add("story"); return a; };
   const selectedChannels = () => { const a = activeCats(); return channels.filter(c => c.cats.some(k => a.has(k))); };
+  let typesOpen = false;
   function paintTypes(){
     const box = $("types"); box.innerHTML = "";
-    box.append(el("h3",{},"Tipo de vídeo"));
+    const chosen = TYPES.filter(t => types.has(t.id)).map(t => t.name);
+    const head = el("button",{class:"checks-h",type:"button","aria-expanded":String(typesOpen),onclick:()=>{ typesOpen = !typesOpen; paintTypes(); }},
+      el("span",{}, el("small",{},"Tipo de vídeo"), el("b",{}, chosen.length ? chosen.join(", ") : "Nenhum marcado")), el("span",{class:"chev"}));
+    box.append(head);
+    if (!typesOpen) return;
     for (const t of TYPES) box.append(el("button",{class:"check",type:"button",role:"checkbox","aria-checked":String(types.has(t.id)),onclick:()=>{
       types.has(t.id) ? types.delete(t.id) : types.add(t.id); store.set("types",[...types]); paintTypes(); updateCost(); }},
-      el("span",{class:"box"}, icon("check")), el("span",{}, el("b",{}, t.name), el("small",{}, t.hint))));
+      el("span",{class:"cbx"}, icon("check")), el("span",{}, el("b",{}, t.name), el("small",{}, t.hint))));
   }
   function updateCost(){
     const durs = new Set([...types].filter(t => t !== "story").map(t => TYPES.find(x => x.id === t).dur));
