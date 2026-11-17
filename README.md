@@ -14,6 +14,11 @@ Precisa de JDK 17+, Android build-tools 35 e platform android-35. Aponte `SDK` p
 
     SDK=/caminho/do/sdk ./build.sh
 
+### No Windows
+Precisa do JDK 17 em `C:\dev\jdk17` e do Android SDK (build-tools 35.0.1 e platform android-35) em `C:\dev\android-sdk`. A chave fica em `Documentos\chaves\radar.keystore`:
+
+    $env:KS_PASS = "sua-senha"; .\build-windows.ps1
+
 ## Assinatura
 O app é assinado por `radar.keystore`, que **não fica neste repositório**. Guarde o arquivo e a senha fora do GitHub. Para compilar, coloque o arquivo na raiz do projeto e informe a senha:
 
